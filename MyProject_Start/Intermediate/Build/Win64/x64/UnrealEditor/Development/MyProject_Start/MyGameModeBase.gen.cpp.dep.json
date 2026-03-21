@@ -1,0 +1,19 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "c:\\users\\sinoh\\desktop\\unreal\\myproject_start\\intermediate\\build\\win64\\unrealeditor\\inc\\myproject_start\\uht\\mygamemodebase.gen.cpp",
+        "ProvidedModule": "",
+        "PCH": "c:\\users\\sinoh\\desktop\\unreal\\myproject_start\\intermediate\\build\\win64\\x64\\myproject_starteditor\\development\\engine\\sharedpch.engine.cpp20.h.pch",
+        "Includes": [
+            "c:\\users\\sinoh\\desktop\\unreal\\myproject_start\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\myproject_start\\definitions.myproject_start.h",
+            "c:\\users\\sinoh\\desktop\\unreal\\myproject_start\\source\\myproject_start\\mygamemodebase.h",
+            "g:\\ue_5.3\\engine\\source\\runtime\\engine\\classes\\gameframework\\gamemodebase.h",
+            "g:\\ue_5.3\\engine\\source\\runtime\\engine\\classes\\engine\\serverstatreplicator.h",
+            "g:\\ue_5.3\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\serverstatreplicator.generated.h",
+            "g:\\ue_5.3\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\gamemodebase.generated.h",
+            "c:\\users\\sinoh\\desktop\\unreal\\myproject_start\\intermediate\\build\\win64\\unrealeditor\\inc\\myproject_start\\uht\\mygamemodebase.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

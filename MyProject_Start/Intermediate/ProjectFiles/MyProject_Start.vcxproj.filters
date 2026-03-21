@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="..\..\MyProject_Start.uproject" />
+    <Filter Include="Source">
+      <UniqueIdentifier>{F31BBDD1-B3E8-3BCC-9652-680E16935819}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Source\MyProject_Start.Target.cs">
+      <Filter>Source</Filter>
+    </None>
+    <None Include="..\..\Source\MyProject_StartEditor.Target.cs">
+      <Filter>Source</Filter>
+    </None>
+    <None Include="..\..\.vsconfig" />
+    <Filter Include="Config">
+      <UniqueIdentifier>{FA535FFB-25E1-3D20-B416-52F9BE21E06E}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Config\DefaultEditor.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultEngine.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultGame.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultInput.ini">
+      <Filter>Config</Filter>
+    </None>
+    <Filter Include="Source\MyProject_Start">
+      <UniqueIdentifier>{45FDB2FE-80A6-35F6-ACF0-2A79E1AC5FF9}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\MyProject_Start\MyActor_Mesh.cpp">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\MyActor_Mesh.h">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Source\MyProject_Start\MyGameModeBase.cpp">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\MyGameModeBase.h">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClInclude>
+    <None Include="..\..\Source\MyProject_Start\MyProject_Start.Build.cs">
+      <Filter>Source\MyProject_Start</Filter>
+    </None>
+    <ClCompile Include="..\..\Source\MyProject_Start\MyProject_Start.cpp">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\MyProject_Start.h">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Source\MyProject_Start\TutorialAnimInstance.cpp">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\TutorialAnimInstance.h">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClInclude>
+    <Filter Include="Source\MyProject_Start\Player">
+      <UniqueIdentifier>{1D6B5BB0-92D4-33FD-8045-43B3F38E9D27}</UniqueIdentifier>
+    </Filter>
+    <ClCompile Include="..\..\Source\MyProject_Start\Player\MyCharacter_Start.cpp">
+      <Filter>Source\MyProject_Start\Player</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\Player\MyCharacter_Start.h">
+      <Filter>Source\MyProject_Start\Player</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Source\MyProject_Start\Player\TutorialCharacter.cpp">
+      <Filter>Source\MyProject_Start\Player</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\Player\TutorialCharacter.h">
+      <Filter>Source\MyProject_Start\Player</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
