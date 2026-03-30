@@ -8,7 +8,7 @@ public class MyProject_Start : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "MotionWarping" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
