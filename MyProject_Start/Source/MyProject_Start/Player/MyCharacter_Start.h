@@ -35,5 +35,7 @@ protected:
 	void MoveRight(float InputValue);
 	void Turn(float InputValue);
 	void LookUp(float InputValue);
+	void TryVault();
+	bool bIsVaulting = false;
 };
 

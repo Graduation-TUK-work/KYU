@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "MotionWarpingComponent.h"
 #include "TutorialCharacter.generated.h"
 
 UCLASS()
@@ -24,9 +25,6 @@ public:
 	void EndSprint();
 	void BeginCrouch();
 	void EndCrouch();
-
-	// 파쿠르
-	void Vault();
 
 protected:
 	// Called when the game starts or when spawned
@@ -58,8 +56,19 @@ protected:
 	class UCameraComponent* Camera;
 	// 파쿠르 관련 변수, 함수
 	bool bCanVault;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
-	class UAnimMontage* VaultMontage;
-	
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vault")
+	UAnimMontage* VaultMontage;
+
+	UPROPERTY(VisibleAnywhere)
+	UMotionWarpingComponent* MotionWarping;
+
+	// 파쿠르
+	void TryVault();
+	bool bIsVaulting = false;
+	FVector VaultStartLocation;
+	FVector VaultTargetLocation;
+
+	bool bIsVaultMoving = false;
+	float VaultAlpha = 0.0f;
 };

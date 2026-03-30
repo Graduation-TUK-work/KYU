@@ -3,6 +3,7 @@
 
 #include "MyProject_Start/Player/MyCharacter_Start.h"
 #include "Camera/CameraComponent.h"
+#include "DrawDebugHelpers.h"
 
 // Sets default values
 AMyCharacter_Start::AMyCharacter_Start()
@@ -41,7 +42,11 @@ void AMyCharacter_Start::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	PlayerInputComponent->BindAxis("TurnCamera", this, &AMyCharacter_Start::Turn);
 	PlayerInputComponent->BindAxis("LookUp", this, &AMyCharacter_Start::LookUp);
 
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	PlayerInputComponent->BindAction("Vault", IE_Pressed, this, &AMyCharacter_Start::TryVault);
 }
+
 
 void AMyCharacter_Start::MoveForward(float InputValue)
 {
@@ -63,5 +68,38 @@ void AMyCharacter_Start::Turn(float InputValue)
 void AMyCharacter_Start::LookUp(float InputValue)
 {
 	AddControllerPitchInput(InputValue);
+}
+	
+
+void AMyCharacter_Start::TryVault()
+{
+	FVector Start = GetActorLocation() + FVector(0, 0, 50);
+	FVector End = Start + GetActorForwardVector() * 100;
+
+	FHitResult Hit;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	bool bHit = GetWorld()->LineTraceSingleByChannel(
+		Hit,
+		Start,
+		End,
+		ECC_Visibility,
+		Params
+	);
+
+	DrawDebugLine(
+		GetWorld(),
+		Start,
+		End,
+		FColor::Green,
+		false,
+		2.0f
+	);
+
+	if (bHit)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("장애물 감지됨!"));
+	}
 }
 
