@@ -1,0 +1,53 @@
+"C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Source/MyProject_Start/MyGameModeBase.cpp"
+@"C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/UnrealEditor/DebugGame/MyProject_Start/MyProject_Start.Shared.rsp"
+/FI"C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/MyProject_StartEditor/DebugGame/UnrealEd/SharedPCH.UnrealEd.Project.NonOptimized.ValApi.ValExpApi.Cpp20.h"
+/FI"C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/UnrealEditor/DebugGame/MyProject_Start/Definitions.MyProject_Start.h"
+/Yu"C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/MyProject_StartEditor/DebugGame/UnrealEd/SharedPCH.UnrealEd.Project.NonOptimized.ValApi.ValExpApi.Cpp20.h"
+/Fp"C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/MyProject_StartEditor/DebugGame/UnrealEd/SharedPCH.UnrealEd.Project.NonOptimized.ValApi.ValExpApi.Cpp20.h.pch"
+/Fo"C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/UnrealEditor/DebugGame/MyProject_Start/MyGameModeBase.cpp.obj"
+/experimental:log "C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/UnrealEditor/DebugGame/MyProject_Start/MyGameModeBase.cpp.sarif"
+/sourceDependencies "C:/Users/Ham Min Kyu/Documents/GitHub/KYU/MyProject_Start/Intermediate/Build/Win64/x64/UnrealEditor/DebugGame/MyProject_Start/MyGameModeBase.cpp.dep.json"
+/d2ssa-cfg-question-
+/nologo
+/Oi
+/FC
+/diagnostics:caret
+/c
+/Gw
+/Gy
+/utf-8
+/wd4819
+/DSAL_NO_ATTRIBUTE_DECLARATIONS=1
+/permissive-
+/Zc:strictStrings-
+/Zc:__cplusplus
+/Zc:inline
+/Zc:preprocessor
+/D_CRT_STDIO_LEGACY_WIDE_SPECIFIERS=1
+/D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS=1
+/D_WINDLL
+/D_DISABLE_EXTENDED_ALIGNED_STORAGE
+/Ob2
+/d2ExtendedWarningInfo
+/Od
+/errorReport:prompt
+/EHsc
+/DPLATFORM_EXCEPTIONS_DISABLED=0
+/Z7
+/MD
+/bigobj
+/fp:fast
+/Zp8
+/W4
+/we4456
+/we4458
+/we4459
+/wd4244
+/wd4838
+/we4668
+/wd4267
+/wd4100
+/TP
+/GR-
+/std:c++20
+/wd5054

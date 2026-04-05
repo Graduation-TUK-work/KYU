@@ -6,83 +6,113 @@
 
 #include "UObject/GeneratedCppIncludes.h"
 #include "MyProject_Start/MyActor_Mesh.h"
+
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
+static_assert(!UE_WITH_CONSTINIT_UOBJECT, "This generated code can only be compiled with !UE_WITH_CONSTINIT_OBJECT");
 void EmptyLinkFunctionForGeneratedCodeMyActor_Mesh() {}
-// Cross Module References
-	ENGINE_API UClass* Z_Construct_UClass_AActor();
-	MYPROJECT_START_API UClass* Z_Construct_UClass_AMyActor_Mesh();
-	MYPROJECT_START_API UClass* Z_Construct_UClass_AMyActor_Mesh_NoRegister();
-	UPackage* Z_Construct_UPackage__Script_MyProject_Start();
-// End Cross Module References
-	void AMyActor_Mesh::StaticRegisterNativesAMyActor_Mesh()
+
+// ********** Begin Cross Module References ********************************************************
+ENGINE_API UClass* Z_Construct_UClass_AActor();
+MYPROJECT_START_API UClass* Z_Construct_UClass_AMyActor_Mesh();
+MYPROJECT_START_API UClass* Z_Construct_UClass_AMyActor_Mesh_NoRegister();
+UPackage* Z_Construct_UPackage__Script_MyProject_Start();
+// ********** End Cross Module References **********************************************************
+
+// ********** Begin Class AMyActor_Mesh ************************************************************
+FClassRegistrationInfo Z_Registration_Info_UClass_AMyActor_Mesh;
+UClass* AMyActor_Mesh::GetPrivateStaticClass()
+{
+	using TClass = AMyActor_Mesh;
+	if (!Z_Registration_Info_UClass_AMyActor_Mesh.InnerSingleton)
 	{
+		GetPrivateStaticClassBody(
+			TClass::StaticPackage(),
+			TEXT("MyActor_Mesh"),
+			Z_Registration_Info_UClass_AMyActor_Mesh.InnerSingleton,
+			StaticRegisterNativesAMyActor_Mesh,
+			sizeof(TClass),
+			alignof(TClass),
+			TClass::StaticClassFlags,
+			TClass::StaticClassCastFlags(),
+			TClass::StaticConfigName(),
+			(UClass::ClassConstructorType)InternalConstructor<TClass>,
+			(UClass::ClassVTableHelperCtorCallerType)InternalVTableHelperCtorCaller<TClass>,
+			UOBJECT_CPPCLASS_STATICFUNCTIONS_FORCLASS(TClass),
+			&TClass::Super::StaticClass,
+			&TClass::WithinClass::StaticClass
+		);
 	}
-	IMPLEMENT_CLASS_NO_AUTO_REGISTRATION(AMyActor_Mesh);
-	UClass* Z_Construct_UClass_AMyActor_Mesh_NoRegister()
-	{
-		return AMyActor_Mesh::StaticClass();
-	}
-	struct Z_Construct_UClass_AMyActor_Mesh_Statics
-	{
-		static UObject* (*const DependentSingletons[])();
+	return Z_Registration_Info_UClass_AMyActor_Mesh.InnerSingleton;
+}
+UClass* Z_Construct_UClass_AMyActor_Mesh_NoRegister()
+{
+	return AMyActor_Mesh::GetPrivateStaticClass();
+}
+struct Z_Construct_UClass_AMyActor_Mesh_Statics
+{
 #if WITH_METADATA
-		static const UECodeGen_Private::FMetaDataPairParam Class_MetaDataParams[];
-#endif
-		static const FCppClassTypeInfoStatic StaticCppClassTypeInfo;
-		static const UECodeGen_Private::FClassParams ClassParams;
-	};
-	UObject* (*const Z_Construct_UClass_AMyActor_Mesh_Statics::DependentSingletons[])() = {
-		(UObject* (*)())Z_Construct_UClass_AActor,
-		(UObject* (*)())Z_Construct_UPackage__Script_MyProject_Start,
-	};
-	static_assert(UE_ARRAY_COUNT(Z_Construct_UClass_AMyActor_Mesh_Statics::DependentSingletons) < 16);
-#if WITH_METADATA
-	const UECodeGen_Private::FMetaDataPairParam Z_Construct_UClass_AMyActor_Mesh_Statics::Class_MetaDataParams[] = {
+	static constexpr UECodeGen_Private::FMetaDataPairParam Class_MetaDataParams[] = {
 		{ "IncludePath", "MyActor_Mesh.h" },
 		{ "ModuleRelativePath", "MyActor_Mesh.h" },
 	};
-#endif
-	const FCppClassTypeInfoStatic Z_Construct_UClass_AMyActor_Mesh_Statics::StaticCppClassTypeInfo = {
+#endif // WITH_METADATA
+
+// ********** Begin Class AMyActor_Mesh constinit property declarations ****************************
+// ********** End Class AMyActor_Mesh constinit property declarations ******************************
+	static UObject* (*const DependentSingletons[])();
+	static constexpr FCppClassTypeInfoStatic StaticCppClassTypeInfo = {
 		TCppClassTypeTraits<AMyActor_Mesh>::IsAbstract,
 	};
-	const UECodeGen_Private::FClassParams Z_Construct_UClass_AMyActor_Mesh_Statics::ClassParams = {
-		&AMyActor_Mesh::StaticClass,
-		"Engine",
-		&StaticCppClassTypeInfo,
-		DependentSingletons,
-		nullptr,
-		nullptr,
-		nullptr,
-		UE_ARRAY_COUNT(DependentSingletons),
-		0,
-		0,
-		0,
-		0x009000A4u,
-		METADATA_PARAMS(UE_ARRAY_COUNT(Z_Construct_UClass_AMyActor_Mesh_Statics::Class_MetaDataParams), Z_Construct_UClass_AMyActor_Mesh_Statics::Class_MetaDataParams)
-	};
-	UClass* Z_Construct_UClass_AMyActor_Mesh()
+	static const UECodeGen_Private::FClassParams ClassParams;
+}; // struct Z_Construct_UClass_AMyActor_Mesh_Statics
+UObject* (*const Z_Construct_UClass_AMyActor_Mesh_Statics::DependentSingletons[])() = {
+	(UObject* (*)())Z_Construct_UClass_AActor,
+	(UObject* (*)())Z_Construct_UPackage__Script_MyProject_Start,
+};
+static_assert(UE_ARRAY_COUNT(Z_Construct_UClass_AMyActor_Mesh_Statics::DependentSingletons) < 16);
+const UECodeGen_Private::FClassParams Z_Construct_UClass_AMyActor_Mesh_Statics::ClassParams = {
+	&AMyActor_Mesh::StaticClass,
+	"Engine",
+	&StaticCppClassTypeInfo,
+	DependentSingletons,
+	nullptr,
+	nullptr,
+	nullptr,
+	UE_ARRAY_COUNT(DependentSingletons),
+	0,
+	0,
+	0,
+	0x009000A4u,
+	METADATA_PARAMS(UE_ARRAY_COUNT(Z_Construct_UClass_AMyActor_Mesh_Statics::Class_MetaDataParams), Z_Construct_UClass_AMyActor_Mesh_Statics::Class_MetaDataParams)
+};
+void AMyActor_Mesh::StaticRegisterNativesAMyActor_Mesh()
+{
+}
+UClass* Z_Construct_UClass_AMyActor_Mesh()
+{
+	if (!Z_Registration_Info_UClass_AMyActor_Mesh.OuterSingleton)
 	{
-		if (!Z_Registration_Info_UClass_AMyActor_Mesh.OuterSingleton)
-		{
-			UECodeGen_Private::ConstructUClass(Z_Registration_Info_UClass_AMyActor_Mesh.OuterSingleton, Z_Construct_UClass_AMyActor_Mesh_Statics::ClassParams);
-		}
-		return Z_Registration_Info_UClass_AMyActor_Mesh.OuterSingleton;
+		UECodeGen_Private::ConstructUClass(Z_Registration_Info_UClass_AMyActor_Mesh.OuterSingleton, Z_Construct_UClass_AMyActor_Mesh_Statics::ClassParams);
 	}
-	template<> MYPROJECT_START_API UClass* StaticClass<AMyActor_Mesh>()
-	{
-		return AMyActor_Mesh::StaticClass();
-	}
-	DEFINE_VTABLE_PTR_HELPER_CTOR(AMyActor_Mesh);
-	AMyActor_Mesh::~AMyActor_Mesh() {}
-	struct Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_Statics
-	{
-		static const FClassRegisterCompiledInInfo ClassInfo[];
+	return Z_Registration_Info_UClass_AMyActor_Mesh.OuterSingleton;
+}
+DEFINE_VTABLE_PTR_HELPER_CTOR_NS(, AMyActor_Mesh);
+AMyActor_Mesh::~AMyActor_Mesh() {}
+// ********** End Class AMyActor_Mesh **************************************************************
+
+// ********** Begin Registration *******************************************************************
+struct Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h__Script_MyProject_Start_Statics
+{
+	static constexpr FClassRegisterCompiledInInfo ClassInfo[] = {
+		{ Z_Construct_UClass_AMyActor_Mesh, AMyActor_Mesh::StaticClass, TEXT("AMyActor_Mesh"), &Z_Registration_Info_UClass_AMyActor_Mesh, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(AMyActor_Mesh), 2889310484U) },
 	};
-	const FClassRegisterCompiledInInfo Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_Statics::ClassInfo[] = {
-		{ Z_Construct_UClass_AMyActor_Mesh, AMyActor_Mesh::StaticClass, TEXT("AMyActor_Mesh"), &Z_Registration_Info_UClass_AMyActor_Mesh, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(AMyActor_Mesh), 3571656321U) },
-	};
-	static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_3011525256(TEXT("/Script/MyProject_Start"),
-		Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_Statics::ClassInfo),
-		nullptr, 0,
-		nullptr, 0);
+}; // Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h__Script_MyProject_Start_Statics 
+static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h__Script_MyProject_Start_2936426983{
+	TEXT("/Script/MyProject_Start"),
+	Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h__Script_MyProject_Start_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h__Script_MyProject_Start_Statics::ClassInfo),
+	nullptr, 0,
+	nullptr, 0,
+};
+// ********** End Registration *********************************************************************
+
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

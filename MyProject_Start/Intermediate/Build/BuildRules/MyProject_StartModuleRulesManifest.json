@@ -1,8 +1,8 @@
 {
 	"SourceFiles": [
-		"C:\\Users\\sinoh\\Desktop\\git\\KYU\\MyProject_Start\\Source\\MyProject_Start\\MyProject_Start.Build.cs",
-		"C:\\Users\\sinoh\\Desktop\\git\\KYU\\MyProject_Start\\Source\\MyProject_Start.Target.cs",
-		"C:\\Users\\sinoh\\Desktop\\git\\KYU\\MyProject_Start\\Source\\MyProject_StartEditor.Target.cs"
+		"C:\\Users\\Ham Min Kyu\\Documents\\GitHub\\KYU\\MyProject_Start\\Source\\MyProject_Start\\MyProject_Start.Build.cs",
+		"C:\\Users\\Ham Min Kyu\\Documents\\GitHub\\KYU\\MyProject_Start\\Source\\MyProject_Start.Target.cs",
+		"C:\\Users\\Ham Min Kyu\\Documents\\GitHub\\KYU\\MyProject_Start\\Source\\MyProject_StartEditor.Target.cs"
 	],
-	"EngineVersion": "5.3.2"
+	"EngineVersion": "5.7.4"
 }

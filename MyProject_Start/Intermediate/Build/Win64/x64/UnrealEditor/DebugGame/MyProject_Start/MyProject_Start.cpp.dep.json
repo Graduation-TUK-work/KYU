@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "c:\\users\\ham min kyu\\documents\\github\\kyu\\myproject_start\\source\\myproject_start\\myproject_start.cpp",
+        "ProvidedModule": "",
+        "PCH": "c:\\users\\ham min kyu\\documents\\github\\kyu\\myproject_start\\intermediate\\build\\win64\\x64\\myproject_starteditor\\debuggame\\unrealed\\sharedpch.unrealed.project.nonoptimized.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "c:\\users\\ham min kyu\\documents\\github\\kyu\\myproject_start\\intermediate\\build\\win64\\x64\\unrealeditor\\debuggame\\myproject_start\\definitions.myproject_start.h",
+            "c:\\users\\ham min kyu\\documents\\github\\kyu\\myproject_start\\source\\myproject_start\\myproject_start.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}
