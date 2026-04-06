@@ -1,0 +1,14 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.MyProject_Start.gen.cpp.obj": [
+			"KillerGameModeBase.gen.cpp.obj",
+			"MyActor_Mesh.gen.cpp.obj",
+			"MyCharacter_Start.gen.cpp.obj",
+			"MyGameModeBase.gen.cpp.obj",
+			"MyProject_Start.init.gen.cpp.obj",
+			"TutorialAnimInstance.gen.cpp.obj",
+			"TutorialCharacter.gen.cpp.obj"
+		]
+	}
+}

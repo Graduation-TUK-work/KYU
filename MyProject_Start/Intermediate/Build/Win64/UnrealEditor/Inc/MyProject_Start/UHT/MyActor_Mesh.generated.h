@@ -20,7 +20,7 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 struct Z_Construct_UClass_AMyActor_Mesh_Statics;
 MYPROJECT_START_API UClass* Z_Construct_UClass_AMyActor_Mesh_NoRegister();
 
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_INCLASS_NO_PURE_DECLS \
+#define FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_INCLASS_NO_PURE_DECLS \
 private: \
 	static void StaticRegisterNativesAMyActor_Mesh(); \
 	friend struct ::Z_Construct_UClass_AMyActor_Mesh_Statics; \
@@ -31,7 +31,7 @@ public: \
 	DECLARE_SERIALIZER(AMyActor_Mesh)
 
 
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_ENHANCED_CONSTRUCTORS \
+#define FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_ENHANCED_CONSTRUCTORS \
 	/** Deleted move- and copy-constructors, should never be used */ \
 	AMyActor_Mesh(AMyActor_Mesh&&) = delete; \
 	AMyActor_Mesh(const AMyActor_Mesh&) = delete; \
@@ -41,12 +41,12 @@ public: \
 	NO_API virtual ~AMyActor_Mesh();
 
 
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_9_PROLOG
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_GENERATED_BODY \
+#define FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_9_PROLOG
+#define FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_GENERATED_BODY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_INCLASS_NO_PURE_DECLS \
-	FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_ENHANCED_CONSTRUCTORS \
+	FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_INCLASS_NO_PURE_DECLS \
+	FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h_12_ENHANCED_CONSTRUCTORS \
 private: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
@@ -56,6 +56,6 @@ class AMyActor_Mesh;
 // ********** End Class AMyActor_Mesh **************************************************************
 
 #undef CURRENT_FILE_ID
-#define CURRENT_FILE_ID FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h
+#define CURRENT_FILE_ID FID_MyProject_Start_Source_MyProject_Start_MyActor_Mesh_h
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

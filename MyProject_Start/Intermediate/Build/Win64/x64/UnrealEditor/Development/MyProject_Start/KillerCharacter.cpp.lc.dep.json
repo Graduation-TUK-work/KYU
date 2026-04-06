@@ -1,0 +1,30 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "c:\\users\\sinoh\\desktop\\git\\kyu\\myproject_start\\source\\myproject_start\\killercharacter.cpp",
+        "ProvidedModule": "",
+        "PCH": "c:\\users\\sinoh\\desktop\\git\\kyu\\myproject_start\\intermediate\\build\\win64\\x64\\myproject_starteditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "c:\\users\\sinoh\\desktop\\git\\kyu\\myproject_start\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\myproject_start\\definitions.myproject_start.h",
+            "c:\\users\\sinoh\\desktop\\git\\kyu\\myproject_start\\source\\myproject_start\\killercharacter.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\gameframework\\character.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\gameframework\\charactermovementreplication.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\net\\core\\public\\net\\core\\nettoken\\nettokenexportcontext.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\net\\iris\\public\\iris\\serialization\\irisobjectreferencepackagemap.h",
+            "f:\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\iriscore\\uht\\irisobjectreferencepackagemap.generated.h",
+            "f:\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\charactermovementreplication.generated.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\gameframework\\rootmotionsource.h",
+            "f:\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\rootmotionsource.generated.h",
+            "f:\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\character.generated.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\camera\\cameracomponent.h",
+            "f:\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\cameracomponent.generated.h",
+            "c:\\users\\sinoh\\desktop\\git\\kyu\\myproject_start\\intermediate\\build\\win64\\unrealeditor\\inc\\myproject_start\\uht\\killercharacter.generated.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\components\\capsulecomponent.h",
+            "f:\\epic games\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\components\\shapecomponent.h",
+            "f:\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\shapecomponent.generated.h",
+            "f:\\epic games\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\capsulecomponent.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

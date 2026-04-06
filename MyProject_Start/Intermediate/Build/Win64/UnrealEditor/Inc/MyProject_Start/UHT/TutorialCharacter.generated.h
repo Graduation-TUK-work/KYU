@@ -17,14 +17,14 @@
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 
 // ********** Begin Class ATutorialCharacter *******************************************************
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_RPC_WRAPPERS_NO_PURE_DECLS \
+#define FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_RPC_WRAPPERS_NO_PURE_DECLS \
 	DECLARE_FUNCTION(execSetCanVault);
 
 
 struct Z_Construct_UClass_ATutorialCharacter_Statics;
 MYPROJECT_START_API UClass* Z_Construct_UClass_ATutorialCharacter_NoRegister();
 
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_INCLASS_NO_PURE_DECLS \
+#define FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_INCLASS_NO_PURE_DECLS \
 private: \
 	static void StaticRegisterNativesATutorialCharacter(); \
 	friend struct ::Z_Construct_UClass_ATutorialCharacter_Statics; \
@@ -35,7 +35,7 @@ public: \
 	DECLARE_SERIALIZER(ATutorialCharacter)
 
 
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_ENHANCED_CONSTRUCTORS \
+#define FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_ENHANCED_CONSTRUCTORS \
 	/** Deleted move- and copy-constructors, should never be used */ \
 	ATutorialCharacter(ATutorialCharacter&&) = delete; \
 	ATutorialCharacter(const ATutorialCharacter&) = delete; \
@@ -45,13 +45,13 @@ public: \
 	NO_API virtual ~ATutorialCharacter();
 
 
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_10_PROLOG
-#define FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_GENERATED_BODY \
+#define FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_10_PROLOG
+#define FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_GENERATED_BODY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_RPC_WRAPPERS_NO_PURE_DECLS \
-	FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_INCLASS_NO_PURE_DECLS \
-	FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_ENHANCED_CONSTRUCTORS \
+	FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_RPC_WRAPPERS_NO_PURE_DECLS \
+	FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_INCLASS_NO_PURE_DECLS \
+	FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h_13_ENHANCED_CONSTRUCTORS \
 private: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
@@ -61,6 +61,6 @@ class ATutorialCharacter;
 // ********** End Class ATutorialCharacter *********************************************************
 
 #undef CURRENT_FILE_ID
-#define CURRENT_FILE_ID FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h
+#define CURRENT_FILE_ID FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h
 
 PRAGMA_ENABLE_DEPRECATION_WARNINGS

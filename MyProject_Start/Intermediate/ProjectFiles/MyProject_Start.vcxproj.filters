@@ -30,6 +30,18 @@
     <Filter Include="Source\MyProject_Start">
       <UniqueIdentifier>{45FDB2FE-80A6-35F6-ACF0-2A79E1AC5FF9}</UniqueIdentifier>
     </Filter>
+    <ClCompile Include="..\..\Source\MyProject_Start\KillerCharacter.cpp">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\KillerCharacter.h">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Source\MyProject_Start\KillerGameModeBase.cpp">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\MyProject_Start\KillerGameModeBase.h">
+      <Filter>Source\MyProject_Start</Filter>
+    </ClInclude>
     <ClCompile Include="..\..\Source\MyProject_Start\MyActor_Mesh.cpp">
       <Filter>Source\MyProject_Start</Filter>
     </ClCompile>

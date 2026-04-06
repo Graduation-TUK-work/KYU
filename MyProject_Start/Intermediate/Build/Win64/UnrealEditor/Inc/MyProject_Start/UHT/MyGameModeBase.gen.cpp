@@ -107,15 +107,15 @@ AMyGameModeBase::~AMyGameModeBase() {}
 // ********** End Class AMyGameModeBase ************************************************************
 
 // ********** Begin Registration *******************************************************************
-struct Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics
+struct Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics
 {
 	static constexpr FClassRegisterCompiledInInfo ClassInfo[] = {
 		{ Z_Construct_UClass_AMyGameModeBase, AMyGameModeBase::StaticClass, TEXT("AMyGameModeBase"), &Z_Registration_Info_UClass_AMyGameModeBase, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(AMyGameModeBase), 3987127137U) },
 	};
-}; // Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics 
-static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_2806879221{
+}; // Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics 
+static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_2806879221{
 	TEXT("/Script/MyProject_Start"),
-	Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics::ClassInfo),
+	Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_MyGameModeBase_h__Script_MyProject_Start_Statics::ClassInfo),
 	nullptr, 0,
 	nullptr, 0,
 };

@@ -247,15 +247,15 @@ ATutorialCharacter::~ATutorialCharacter() {}
 // ********** End Class ATutorialCharacter *********************************************************
 
 // ********** Begin Registration *******************************************************************
-struct Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics
+struct Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics
 {
 	static constexpr FClassRegisterCompiledInInfo ClassInfo[] = {
 		{ Z_Construct_UClass_ATutorialCharacter, ATutorialCharacter::StaticClass, TEXT("ATutorialCharacter"), &Z_Registration_Info_UClass_ATutorialCharacter, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(ATutorialCharacter), 3367666858U) },
 	};
-}; // Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics 
-static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_3521606530{
+}; // Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics 
+static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_3521606530{
 	TEXT("/Script/MyProject_Start"),
-	Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_Users_Ham_Min_Kyu_Documents_GitHub_KYU_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics::ClassInfo),
+	Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_MyProject_Start_Source_MyProject_Start_Player_TutorialCharacter_h__Script_MyProject_Start_Statics::ClassInfo),
 	nullptr, 0,
 	nullptr, 0,
 };
