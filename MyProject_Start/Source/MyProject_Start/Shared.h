@@ -16,9 +16,16 @@ enum EPacketType : uint8 {
     PKT_MOVE = 2,
 };
 
+enum ECharacterType : uint8 {
+    CHARACTER_SURVIVOR = 1,
+    CHARACTER_KILLER = 2,
+};
+
 struct FPlayerData {
     int32 PlayerId;
+    uint8 CharacterType;
     float X, Y, Z;
+    float RotationYaw;
     float ForwardValue; // 앞뒤 입력 (-1.0 ~ 1.0)
     float RightValue;   // 좌우 입력 (-1.0 ~ 1.0)
     bool bIsSprinting;  // 달리기 상태

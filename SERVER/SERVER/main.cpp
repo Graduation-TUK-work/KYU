@@ -1,6 +1,7 @@
 #include <winsock2.h>
 #include <iostream>
 #include <vector>
+#include <map>
 #include <list>
 #include <mutex>
 #include "Shared.h"
@@ -8,7 +9,10 @@
 #pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
-// IOCP에서 사용할 컨텍스트
+// 전역 카운터 및 데이터베이스
+int g_idCounter = 0;
+mutex g_idLock;
+
 enum class IO_TYPE { READ, WRITE };
 
 struct Session {
@@ -22,20 +26,29 @@ struct OverlappedContext {
     IO_TYPE ioType;
 };
 
-// 전역 변수: 세션 관리 및 동기화
+struct PlayerInfo {
+    int32 PlayerId;
+    float X, Y, Z;
+    float RotationYaw;
+    uint8 CharacterType; // 1: 생존자, 2: 살인마
+};
+
+map<int32, PlayerInfo> g_playerDataMap;
+mutex g_dataLock;
+
 list<Session*> g_sessions;
 mutex g_sessionLock;
 
-// 다른 모든 클라이언트에게 데이터 전송 (Broadcast)
+// 브로드캐스트: 모든 클라이언트에게 패킷 전송
 void Broadcast(char* buf, int len, Session* exceptSession = nullptr) {
     lock_guard<mutex> lock(g_sessionLock);
     for (Session* s : g_sessions) {
-        if (s == exceptSession) continue; // 보낸 사람 본인은 제외
+        if (s == exceptSession) continue;
         send(s->socket, buf, len, 0);
     }
 }
 
-// 워커 스레드: 패킷 처리의 핵심
+// 워커 스레드: 패킷 수신 및 처리
 DWORD WINAPI WorkerThread(LPVOID lpParam) {
     HANDLE hIOCP = (HANDLE)lpParam;
     DWORD bytesTransferred = 0;
@@ -47,12 +60,15 @@ DWORD WINAPI WorkerThread(LPVOID lpParam) {
             hIOCP, &bytesTransferred, (PULONG_PTR)&pSession, (LPOVERLAPPED*)&pContext, INFINITE
         );
 
-        // 접속 종료 시
         if (result == FALSE || bytesTransferred == 0) {
             cout << "[알림] 클라이언트 접속 종료" << endl;
             lock_guard<mutex> lock(g_sessionLock);
             g_sessions.remove(pSession);
             closesocket(pSession->socket);
+
+            // 데이터베이스에서도 제거 (필요 시)
+            // { lock_guard<mutex> lock(g_dataLock); g_playerDataMap.erase(pSessionID); }
+
             delete pSession;
             delete pContext;
             continue;
@@ -64,17 +80,24 @@ DWORD WINAPI WorkerThread(LPVOID lpParam) {
             switch (packetType) {
             case PKT_MOVE: {
                 FPacketMove* movePkt = (FPacketMove*)pContext->buffer;
-                // 실시간 좌표 출력 (디버깅용)
-                printf("ID[%d] Move: X=%.1f, Y=%.1f, Z=%.1f\n",
-                    movePkt->Data.PlayerId, movePkt->Data.X, movePkt->Data.Y, movePkt->Data.Z);
+                {
+                    lock_guard<mutex> lock(g_dataLock);
+                    int id = movePkt->Data.PlayerId;
 
-                // 핵심: 나를 제외한 모든 클라이언트에게 이 좌표를 그대로 전달
+                    // 최신 데이터 업데이트
+                    g_playerDataMap[id].X = movePkt->Data.X;
+                    g_playerDataMap[id].Y = movePkt->Data.Y;
+                    g_playerDataMap[id].Z = movePkt->Data.Z;
+                    g_playerDataMap[id].RotationYaw = movePkt->Data.RotationYaw;
+                    g_playerDataMap[id].CharacterType = movePkt->Data.CharacterType;
+                }
+                // 다른 모든 클라이언트에게 위치 전송
                 Broadcast(pContext->buffer, sizeof(FPacketMove), pSession);
                 break;
             }
             }
 
-            // 다음 패킷 수신 예약 (낚싯대 재투척)
+            // 재수신 예약
             DWORD flags = 0;
             DWORD recvBytes = 0;
             memset(&pContext->overlapped, 0, sizeof(OVERLAPPED));
@@ -122,21 +145,65 @@ int main() {
                 g_sessions.push_back(newSession);
             }
 
+            // 1. ID 할당 및 역할 결정
+            FPacketJoin joinPkt;
+            joinPkt.Type = PKT_JOIN;
+            {
+                lock_guard<mutex> lock(g_idLock);
+                joinPkt.MyId = g_idCounter++;
+            }
+
+            // 0번은 살인마(2), 나머지는 생존자(1)
+            uint8 assignedType = (joinPkt.MyId == 0) ? 2 : 1;
+
+            // 2. [수정사항] 데이터베이스에 즉시 등록
+            {
+                lock_guard<mutex> lock(g_dataLock);
+                PlayerInfo info;
+                info.PlayerId = joinPkt.MyId;
+                info.CharacterType = assignedType;
+                info.X = 0.0f;
+                info.Y = 0.0f;
+                info.Z = 100.0f; // 스폰 시 바닥에 묻히지 않게 살짝 띄움
+                info.RotationYaw = 0.0f;
+                g_playerDataMap[joinPkt.MyId] = info;
+            }
+
+            CreateIoCompletionPort((HANDLE)clientSocket, hIOCP, (ULONG_PTR)newSession, 0);
+
+            // 3. 본인에게 ID 부여 패킷 전송
+            send(clientSocket, (char*)&joinPkt, sizeof(joinPkt), 0);
+
+            // 4. [수정사항] 기존 플레이어 정보 전송 (본인 제외)
+            {
+                lock_guard<mutex> lock(g_dataLock);
+                for (auto it = g_playerDataMap.begin(); it != g_playerDataMap.end(); ++it)
+                {
+                    if (it->first == joinPkt.MyId) continue; // 방금 들어온 본인 정보는 패스
+
+                    FPacketMove oldPlayerPkt;
+                    memset(&oldPlayerPkt, 0, sizeof(oldPlayerPkt));
+                    oldPlayerPkt.Type = PKT_MOVE;
+                    oldPlayerPkt.Data.PlayerId = it->second.PlayerId;
+                    oldPlayerPkt.Data.CharacterType = it->second.CharacterType;
+                    oldPlayerPkt.Data.X = it->second.X;
+                    oldPlayerPkt.Data.Y = it->second.Y;
+                    oldPlayerPkt.Data.Z = it->second.Z;
+                    oldPlayerPkt.Data.RotationYaw = it->second.RotationYaw;
+
+                    send(clientSocket, (char*)&oldPlayerPkt, sizeof(oldPlayerPkt), 0);
+                }
+            }
+
+            cout << "[할당] ID " << joinPkt.MyId << " (Type: " << (int)assignedType << ") 부여 완료!" << endl;
+
+            // 5. 최초 수신 예약
             OverlappedContext* recvContext = new OverlappedContext();
             memset(recvContext, 0, sizeof(OverlappedContext));
             recvContext->ioType = IO_TYPE::READ;
             recvContext->wsaBuf.buf = recvContext->buffer;
             recvContext->wsaBuf.len = sizeof(recvContext->buffer);
 
-            CreateIoCompletionPort((HANDLE)clientSocket, hIOCP, (ULONG_PTR)newSession, 0);
-
-            // 1. 클라이언트에게 접속 ID 부여 (PKT_JOIN)
-            FPacketJoin joinPkt;
-            joinPkt.Type = PKT_JOIN;
-            joinPkt.MyId = (int)clientSocket; // 소켓 핸들을 임시 ID로 사용
-            send(clientSocket, (char*)&joinPkt, sizeof(joinPkt), 0);
-
-            // 2. 최초 수신 예약
             DWORD flags = 0;
             DWORD recvBytes = 0;
             WSARecv(clientSocket, &recvContext->wsaBuf, 1, &recvBytes, &flags, &recvContext->overlapped, NULL);

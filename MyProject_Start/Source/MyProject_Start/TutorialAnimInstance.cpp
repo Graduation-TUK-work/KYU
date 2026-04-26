@@ -18,8 +18,16 @@ void UTutorialAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		auto Character = Cast<ATutorialCharacter>(Pawn);
 		if (Character)
 		{
-			Vertical = Character->MoveForwardValue;
-			Horizontal = Character->MoveRightValue;
+			if (Character->IsPlayerControlled())
+			{
+				Vertical = Character->MoveForwardValue;
+				Horizontal = Character->MoveRightValue;
+			}
+			else
+			{
+				Vertical = Character->RemoteForwardValue;
+				Horizontal = Character->RemoteRightValue;
+			}
 		}
 	}
 }

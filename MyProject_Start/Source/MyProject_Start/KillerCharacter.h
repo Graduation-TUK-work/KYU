@@ -7,79 +7,112 @@
 #include "Camera/CameraComponent.h"
 #include "KillerCharacter.generated.h"
 
+class FNetworkWorker;
+class ATutorialCharacter;
+
 UCLASS()
 class MYPROJECT_START_API AKillerCharacter : public ACharacter
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
-	AKillerCharacter();
+    AKillerCharacter();
+
+    static TMap<int32, AKillerCharacter*> RemoteKillers;
+    static TMap<int32, ATutorialCharacter*> RemoteSurvivors;
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	// 실제 데미지 판정을 수행할 함수
-	UFUNCTION(BlueprintCallable, Category = "Combat")
-	void CheckHit();
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void CheckHit();
 
-	// 공격 사거리
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
-	float AttackRange = 200.00f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+    float AttackRange = 200.00f;
 
-	bool bHasDealtDamage = false;
+    bool bHasDealtDamage = false;
 
-	// 현재 들고 있는 생존자
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Carry")
-	class ATutorialCharacter* CarriedSurvivor;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Carry")
+    ATutorialCharacter* CarriedSurvivor;
 
-	// 생존자 들기 함수
-	void PickupSurvivor();
+    void PickupSurvivor();
+    void DropSurvivor();
 
-	// 생존자 내려놓기 함수 (나중에 갈고리에 걸거나 바닥에 둘 때 사용)
-	void DropSurvivor();
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+    class UAnimMontage* PickupMontage;
 
-	// 생존자를 들어 올릴 때 재생할 몽타주
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
-	class UAnimMontage* PickupMontage;
+    UPROPERTY(BlueprintReadOnly, Category = "Movement")
+    float MovementSpeed;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Movement")
-	float MovementSpeed;
+    UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
+    float RemoteMovementSpeed = 0.0f;
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+    virtual void Tick(float DeltaTime) override;
+    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+    float GetMovementSpeed() const { return MovementSpeed; }
+    float GetRemoteMovementSpeed() const { return RemoteMovementSpeed; }
+    float GetRemoteForwardValue() const { return RemoteForwardValue; }
+    float GetRemoteRightValue() const { return RemoteRightValue; }
+    bool GetRemoteIsAttacking() const { return RemoteIsAttacking; }
+    void SetRemoteForwardValue(float Value) { RemoteForwardValue = Value; }
+    void SetRemoteRightValue(float Value) { RemoteRightValue = Value; }
+    void SetRemoteMovementSpeed(float Value) { RemoteMovementSpeed = Value; }
+    void SetRemoteIsAttacking(bool bValue) { RemoteIsAttacking = bValue; }
 
-	// --- 이동 관련 함수 ---
-	UFUNCTION()
-	void MoveForward(float AxisValue);
+    UFUNCTION()
+    void MoveForward(float AxisValue);
 
-	UFUNCTION()
-	void MoveRight(float AxisValue);
+    UFUNCTION()
+    void MoveRight(float AxisValue);
 
-	// --- 공격 관련 로직 (추가됨) ---
-	UFUNCTION(BlueprintCallable, Category = "Combat") // <- BlueprintCallable 추가!
-		void StartAttack();
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void StartAttack();
 
-	UFUNCTION(BlueprintCallable, Category = "Combat") // <- BlueprintCallable 추가!
-		void EndAttack();
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void EndAttack();
 
-	// 현재 공격 중인지 여부 (애니메이션 블루프린트에서 참조 가능)
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Status")
-	bool bIsAttacking;
+    void SendLocationToServer();
+    void UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
+    void UpdateRemoteSurvivor(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
 
-	// 에디터에서 할당할 공격 몽타주
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
-	class UAnimMontage* AttackMontage;
+    UPROPERTY()
+    float MoveForwardValue = 0;
 
-	// --- 컴포넌트 ---
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
-	UCameraComponent* FPSCamerComponent;
+    UPROPERTY()
+    float MoveRightValue = 0;
 
-	UPROPERTY(VisibleDefaultsOnly, Category = "Mesh")
-	USkeletalMeshComponent* FPSMesh;
+    UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
+    float RemoteForwardValue = 0.0f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
+    float RemoteRightValue = 0.0f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
+    bool RemoteIsAttacking = false;
+
+    FNetworkWorker* NetworkWorker;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Network")
+    int32 MyPlayerId = -1;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Status")
+    bool bIsAttacking;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    class UAnimMontage* AttackMontage;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+    UCameraComponent* FPSCamerComponent;
+
+    UPROPERTY(VisibleDefaultsOnly, Category = "Mesh")
+    USkeletalMeshComponent* FPSMesh;
+
+    UPROPERTY(EditAnywhere, Category = "Multiplayer|Classes")
+    TSubclassOf<AKillerCharacter> KillerBPClass;
+
+    UPROPERTY(EditAnywhere, Category = "Multiplayer|Classes")
+    TSubclassOf<ATutorialCharacter> SurvivorBPClass;
 };
