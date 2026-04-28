@@ -6,12 +6,12 @@
 #include "GameFramework/Character.h"
 #include "MotionWarpingComponent.h"
 #include "MyProject_Start/InteractionInterface.h"
-#include "MyProject_Start/KillerCharacter.h"
 #include "TutorialCharacter.generated.h"
 
 // 1. 전방 선언: 클래스 포인터를 사용하기 위해 선언합니다.
 class FNetworkWorker;
 class AKillerCharacter;
+class UAnimSequence;
 
 UCLASS()
 class MYPROJECT_START_API ATutorialCharacter : public ACharacter
@@ -32,6 +32,11 @@ public:
 	void BeginCrouch();
 	void EndCrouch();
 
+	// 플레이어 ID 관리 맵
+	TMap<int32, ATutorialCharacter*> RemotePlayers;
+    TMap<int32, AKillerCharacter*> RemoteKillers;
+
+
 	// 상호작용
 	UPROPERTY()
 	AActor* CurrentInteractable;
@@ -48,7 +53,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
 	class UAnimMontage* DownedMontage;
 
-	// 빈사 상태인지 확인하는 변수
+	
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    UAnimSequence* HitReactionAnimation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    UAnimSequence* DownedAnimation;
+// 빈사 상태인지 확인하는 변수
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
 	bool IsDowned = false;
 
@@ -56,15 +67,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
 	bool IsBeingCarried = false;
 
-	UPROPERTY(EditAnywhere, Category = "Multiplayer|Classes")
-	TSubclassOf<AKillerCharacter> KillerBPClass;
-
-	UPROPERTY(EditAnywhere, Category = "Multiplayer|Classes")
-	TSubclassOf<ATutorialCharacter> SurvivorBPClass;
-
 	// 다른 플레이어의 위치 정보를 갱신하거나 새로 생성하는 함수
 	void UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
     void UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
+    void HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw);
 
 	UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
 	float RemoteForwardValue;
@@ -87,9 +93,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
 	bool bCanBeHit = true; // 처음엔 맞을 수 있어야 하므로 true
-
-	TMap<int32, ATutorialCharacter*> RemotePlayers;
-	TMap<int32, AKillerCharacter*> RemoteKillers;
 
 public:
 	// Called every frame
@@ -115,6 +118,8 @@ public:
 	// 살인마의 CheckHit에서 호출할 함수
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void PlayHitReaction();
+	void PlayNetworkHitReaction();
+	void ForceDownedState();
 
 	// ------------------------------------------------------------
 	// 3. 서버 관련 멤버 변수
@@ -129,7 +134,6 @@ public:
 	// 서버로 내 위치를 전송하는 함수
 	void SendLocationToServer();
 	// ------------------------------------------------------------
-	void SwitchToKillerClass();
 
 protected:
 	UPROPERTY(VisibleAnywhere)
@@ -153,5 +157,11 @@ protected:
 
 	bool bIsVaultMoving = false;
 	float VaultAlpha = 0.0f;
+
+private:
+    void ApplyHitReaction(bool bRespectCooldown);
+    void PlayTemporaryBodyAnimation(UAnimSequence* Animation);
+    void PlayLoopBodyAnimation(UAnimSequence* Animation);
+    void RestoreBodyAnimClass();
 
 };

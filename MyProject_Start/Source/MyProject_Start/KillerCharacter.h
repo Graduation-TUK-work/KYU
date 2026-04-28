@@ -9,6 +9,7 @@
 
 class FNetworkWorker;
 class ATutorialCharacter;
+class UAnimSequence;
 
 UCLASS()
 class MYPROJECT_START_API AKillerCharacter : public ACharacter
@@ -18,8 +19,9 @@ class MYPROJECT_START_API AKillerCharacter : public ACharacter
 public:
     AKillerCharacter();
 
-    static TMap<int32, AKillerCharacter*> RemoteKillers;
-    static TMap<int32, ATutorialCharacter*> RemoteSurvivors;
+    TMap<int32, AKillerCharacter*> RemoteKillers;
+    TMap<int32, ATutorialCharacter*> RemoteSurvivors;
+
 
 protected:
     virtual void BeginPlay() override;
@@ -45,9 +47,6 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category = "Movement")
     float MovementSpeed;
 
-    UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
-    float RemoteMovementSpeed = 0.0f;
-
 public:
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -56,11 +55,7 @@ public:
     float GetRemoteMovementSpeed() const { return RemoteMovementSpeed; }
     float GetRemoteForwardValue() const { return RemoteForwardValue; }
     float GetRemoteRightValue() const { return RemoteRightValue; }
-    bool GetRemoteIsAttacking() const { return RemoteIsAttacking; }
-    void SetRemoteForwardValue(float Value) { RemoteForwardValue = Value; }
-    void SetRemoteRightValue(float Value) { RemoteRightValue = Value; }
-    void SetRemoteMovementSpeed(float Value) { RemoteMovementSpeed = Value; }
-    void SetRemoteIsAttacking(bool bValue) { RemoteIsAttacking = bValue; }
+    bool GetRemoteIsAttacking() const { return bIsAttacking; }
 
     UFUNCTION()
     void MoveForward(float AxisValue);
@@ -77,6 +72,9 @@ public:
     void SendLocationToServer();
     void UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
     void UpdateRemoteSurvivor(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
+    void HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw);
+    void SendActionToServer(uint8 ActionType, int32 TargetId = -1);
+    void PlayCarryAnimation();
 
     UPROPERTY()
     float MoveForwardValue = 0;
@@ -91,7 +89,7 @@ public:
     float RemoteRightValue = 0.0f;
 
     UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
-    bool RemoteIsAttacking = false;
+    float RemoteMovementSpeed = 0.0f;
 
     FNetworkWorker* NetworkWorker;
 
@@ -104,15 +102,19 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
     class UAnimMontage* AttackMontage;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    UAnimSequence* BodyAttackAnimation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    UAnimSequence* CarryAnimation;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
     UCameraComponent* FPSCamerComponent;
 
     UPROPERTY(VisibleDefaultsOnly, Category = "Mesh")
     USkeletalMeshComponent* FPSMesh;
 
-    UPROPERTY(EditAnywhere, Category = "Multiplayer|Classes")
-    TSubclassOf<AKillerCharacter> KillerBPClass;
-
-    UPROPERTY(EditAnywhere, Category = "Multiplayer|Classes")
-    TSubclassOf<ATutorialCharacter> SurvivorBPClass;
+private:
+    void PlayTemporaryBodyAnimation(UAnimSequence* Animation);
+    void RestoreBodyAnimClass();
 };

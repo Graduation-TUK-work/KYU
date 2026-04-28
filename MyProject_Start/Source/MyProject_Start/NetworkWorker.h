@@ -12,6 +12,9 @@ public:
     FNetworkWorker(FString IP, int32 Port);
     virtual ~FNetworkWorker();
 
+    static FString GetDefaultServerIP();
+    static int32 GetDefaultServerPort();
+
     virtual bool Init() override;
     virtual uint32 Run() override;
     virtual void Stop() override;

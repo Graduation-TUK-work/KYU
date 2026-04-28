@@ -1,97 +1,167 @@
-﻿#include "MyProject_Start/Player/TutorialCharacter.h"
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#include "MyProject_Start/Player/TutorialCharacter.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AnimInstance.h"
 #include "UObject/ConstructorHelpers.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "MyProject_Start/InteractionInterface.h"
-#include "MyProject_Start/NetworkWorker.h" // ??
+#include "MyProject_Start/NetworkWorker.h" // �߰�
 #include "MyProject_Start/KillerCharacter.h"
-#include "Networking.h"    // ??
-#include "Sockets.h"       // ??
+#include "Networking.h"    // �߰�
+#include "Sockets.h"       // �߰�
+
 ATutorialCharacter::ATutorialCharacter()
 {
     bCanVault = false;
     PrimaryActorTick.bCanEverTick = true;
-    // ??? ? ???? ??
+
+    // ī�޶� �� �������� ����
     SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SPRINGARM"));
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("CAMERA"));
+
     SpringArm->SetupAttachment(GetCapsuleComponent());
     Camera->SetupAttachment(SpringArm);
+
     SpringArm->TargetArmLength = 300.f;
     SpringArm->SetRelativeLocationAndRotation(
         FVector(0.f, 0.f, 80.f),
         FRotator(0.f, 0.f, 0.f)
     );
     SpringArm->bUsePawnControlRotation = true;
-    // ?? ?? ? ?? ??
+
+    // �޽� ��ġ �� ȸ�� ����
     GetMesh()->SetRelativeLocationAndRotation(
         FVector(0.f, 0.f, -88.f),
         FRotator(0.f, -90.f, 0.f)
     );
+
     static ConstructorHelpers::FObjectFinder<USkeletalMesh> SM(
-        TEXT("/Script/Engine.SkeletalMesh'/Game/Animation/Walking.Walking'")
+        TEXT("/Script/Engine.SkeletalMesh'/Game/Player/Player.Player'")
     );
     if (SM.Succeeded())
     {
         GetMesh()->SetSkeletalMesh(SM.Object);
     }
-    // ?? ??
+
+
+    static ConstructorHelpers::FObjectFinder<UAnimMontage> HitMontageAsset(
+        TEXT("/Script/Engine.AnimMontage'/Game/Animation/player/AM_Big_Kidney_Hit.AM_Big_Kidney_Hit'")
+    );
+    if (HitMontageAsset.Succeeded())
+    {
+        HitMontage = HitMontageAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UAnimMontage> DownedMontageAsset(
+        TEXT("/Script/Engine.AnimMontage'/Game/Animation/player/AM_Fallen_Idle.AM_Fallen_Idle'")
+    );
+    if (DownedMontageAsset.Succeeded())
+    {
+        DownedMontage = DownedMontageAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> HitReactionAnimationAsset(
+        TEXT("/Script/Engine.AnimSequence'/Game/Animation/player/Big_Kidney_Hit.Big_Kidney_Hit'")
+    );
+    if (HitReactionAnimationAsset.Succeeded())
+    {
+        HitReactionAnimation = HitReactionAnimationAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> DownedAnimationAsset(
+        TEXT("/Script/Engine.AnimSequence'/Game/Animation/player/Fallen_Idle.Fallen_Idle'")
+    );
+    if (DownedAnimationAsset.Succeeded())
+    {
+        DownedAnimation = DownedAnimationAsset.Object;
+    }
+
+    
+    // �̵� ����
     bUseControllerRotationYaw = false;
+
     GetCharacterMovement()->bOrientRotationToMovement = true;
+
     GetCharacterMovement()->RotationRate = FRotator(0.f, 720.0f, 0.f);
+
     GetCharacterMovement()->MaxAcceleration = 2048.0f;
+
     GetCharacterMovement()->BrakingDecelerationWalking = 2048.0f;
     GetCharacterMovement()->GroundFriction = 8.0f;
     GetCharacterMovement()->AirControl = 0.2f;
+
     // ------------------------------------
+
+
+
     NetworkWorker = nullptr;
 }
+
 void ATutorialCharacter::BeginPlay()
 {
-    Super::BeginPlay();
+        Super::BeginPlay();
+
+    if (UClass* SurvivorAnimClass = LoadClass<UAnimInstance>(nullptr, TEXT("/Game/BP/ABP_TutorialAnim.ABP_TutorialAnim_C")))
+    {
+        GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+        GetMesh()->SetAnimInstanceClass(SurvivorAnimClass);
+    }
+
     if (IsPlayerControlled() && IsLocallyControlled())
     {
         RemotePlayers.Empty();
     }
+
     if (IsPlayerControlled() && IsLocallyControlled())
     {
-        NetworkWorker = new FNetworkWorker(TEXT("127.0.0.1"), 7777);
+        NetworkWorker = new FNetworkWorker(FNetworkWorker::GetDefaultServerIP(), FNetworkWorker::GetDefaultServerPort());
         NetworkWorker->SetOwnerCharacter(this);
         FRunnableThread::Create(NetworkWorker, TEXT("NetworkThread"));
     }
 }
+
 void ATutorialCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    // ?? ?? ? ???? ???? ??
+    // ���� ���� �� �����带 �����ϰ� ����
     if (NetworkWorker)
     {
         NetworkWorker->Stop();
-        // ??? ??? ????? ???
+        // �޸� ������ �Ҹ��ڿ��� ó����
     }
+
     Super::EndPlay(EndPlayReason);
-    ATutorialCharacter::RemotePlayers.Empty();
-    ATutorialCharacter::RemoteKillers.Empty();
+    RemotePlayers.Empty();
+    RemoteKillers.Empty();
 }
+
 void ATutorialCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     TraceForInteractable();
-    // ? ???? ???? ??? ?? ??
+
+    // �� ĳ������ ��쿡�� ������ ��ġ ����
     if (IsPlayerControlled() && IsLocallyControlled())
     {
         SendLocationToServer();
     }
+
     if (IsInteracting)
     {
         UE_LOG(LogTemp, Log, TEXT("Current State: INTERACTING..."));
     }
+
     if (IsInteracting && CurrentInteractable)
     {
         IInteractionInterface::Execute_UpdateInteract(CurrentInteractable, DeltaTime);
     }
+
     if (bIsVaultMoving)
     {
         VaultAlpha += DeltaTime * 2.0f;
@@ -101,6 +171,7 @@ void ATutorialCharacter::Tick(float DeltaTime)
             bIsVaulting = false;
         }
     }
+
     if (Controller)
     {
         FRotator ControlRot = Controller->GetControlRotation();
@@ -110,21 +181,25 @@ void ATutorialCharacter::Tick(float DeltaTime)
         AimPitch = Delta.Pitch;
     }
 } 
+
 void ATutorialCharacter::SendLocationToServer()
 {
     if (MyPlayerId == -1) return;
+
     if (NetworkWorker && NetworkWorker->GetSocket())
     {
         FPacketMove MovePkt;
         MovePkt.Type = PKT_MOVE;
         MovePkt.Data.PlayerId = MyPlayerId;
         MovePkt.Data.CharacterType = CHARACTER_SURVIVOR;
-        // ?? ??
+
+        // ��ġ ����
         FVector CurLocation = GetActorLocation();
         MovePkt.Data.X = CurLocation.X;
         MovePkt.Data.Y = CurLocation.Y;
         MovePkt.Data.Z = CurLocation.Z;
         MovePkt.Data.RotationYaw = GetActorRotation().Yaw;
+
         FVector Velocity2D = GetVelocity();
         Velocity2D.Z = 0.0f;
         if (Velocity2D.SizeSquared() > 1.0f)
@@ -143,17 +218,21 @@ void ATutorialCharacter::SendLocationToServer()
             MovePkt.Data.RightValue = 0.0f;
         }
         MovePkt.Data.bIsSprinting = (GetCharacterMovement()->MaxWalkSpeed > 600.0f);
+
         int32 BytesSent = 0;
         NetworkWorker->GetSocket()->Send((uint8*)&MovePkt, sizeof(FPacketMove), BytesSent);
     }
 }
+
 void ATutorialCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
+
     PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &ATutorialCharacter::MoveForward);
     PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &ATutorialCharacter::MoveRight);
     PlayerInputComponent->BindAxis(TEXT("TurnCamera"), this, &ATutorialCharacter::Turn);
     PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &ATutorialCharacter::LookUp);
+
     PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &ATutorialCharacter::BeginCrouch);
     PlayerInputComponent->BindAction("Crouch", IE_Released, this, &ATutorialCharacter::EndCrouch);
     PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &ATutorialCharacter::BeginSprint);
@@ -162,6 +241,7 @@ void ATutorialCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &ATutorialCharacter::StartInteraction);
     PlayerInputComponent->BindAction("Interact", IE_Released, this, &ATutorialCharacter::CancelInteraction);
 }
+
 void ATutorialCharacter::MoveForward(float Value)
 {
     MoveForwardValue = Value;
@@ -173,6 +253,7 @@ void ATutorialCharacter::MoveForward(float Value)
         AddMovementInput(Direction, Value);
     }
 }
+
 void ATutorialCharacter::MoveRight(float Value)
 {
     MoveRightValue = Value;
@@ -184,41 +265,54 @@ void ATutorialCharacter::MoveRight(float Value)
         AddMovementInput(Direction, Value);
     }
 }
+
 void ATutorialCharacter::BeginSprint()
 {
-    // ?? 1000?? 150 ??? 850 ??
+    // ���� 1000���� 150 ������ 850 ����
     GetCharacterMovement()->MaxWalkSpeed = 850.0f;
 }
+
 void ATutorialCharacter::EndSprint()
 {
-    // ?? 600?? 150 ??? 450 ??
+    // ���� 600���� 150 ������ 450 ����
     GetCharacterMovement()->MaxWalkSpeed = 450.0f;
 }
+
 void ATutorialCharacter::Turn(float Value) { AddControllerYawInput(Value); }
 void ATutorialCharacter::LookUp(float Value) { AddControllerPitchInput(Value); }
+
 void ATutorialCharacter::BeginCrouch() { Crouch(); }
 void ATutorialCharacter::EndCrouch() { UnCrouch(); }
+
+
 void ATutorialCharacter::TryVault()
 {
     if (bIsVaulting) return;
+
     FVector Start = GetActorLocation() + FVector(0, 0, 10);
     FVector End = Start + GetActorForwardVector() * 150;
+
     FHitResult Hit;
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
+
     bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params);
     DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 2.0f);
+
     if (bHit)
     {
         FVector TopStart = Hit.ImpactPoint + FVector(0, 0, 100);
         FVector TopEnd = TopStart + FVector(0, 0, 50);
         FHitResult TopHit;
+
         FVector Forward = GetActorForwardVector();
         FVector TargetLocation = Hit.ImpactPoint + Forward * 100;
         TargetLocation.Z += 50;
+
         bool bTopBlocked = GetWorld()->LineTraceSingleByChannel(
             TopHit, TopStart, TopEnd, ECC_Visibility, Params
         );
+
         if (!bTopBlocked)
         {
             bIsVaulting = true;
@@ -230,27 +324,35 @@ void ATutorialCharacter::TryVault()
         }
     }
 }
+
 void ATutorialCharacter::TraceForInteractable()
 {
-    if (!Camera) return; // ???? ??? ?? ? ?
+    if (!Camera) return; // ī�޶� ������ ���� �� ��
+
     FHitResult Hit;
-    // 1. ???? ?? ?? ??? ?? ??? ?????.
+    // 1. ī�޶��� ���� ���� ��ġ�� ���� ������ �����ɴϴ�.
     FVector StartLocation = Camera->GetComponentLocation();
     FVector ForwardVector = Camera->GetForwardVector();
-    // 2. ???(Start)? ??? ? ??? 1?? ?? ?????. (?? ?? ?? ??)
+
+    // 2. ������(Start)�� ĳ���� �� ������ 1���� ���� �о���ϴ�. (�ڱ� �ڽ� �浹 ����)
     FVector TraceStart = StartLocation + (ForwardVector * 100.f);
-    // 3. ??(End)? ????? 300 unit(3??) ? ??? ?????.
+
+    // 3. ����(End)�� ���������� 300 unit(3����) �� ������ �����մϴ�.
     FVector TraceEnd = TraceStart + (ForwardVector * 300.f);
+
     FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this); // ??(??? ??) ??
-    // 4. LineTrace ??
+    Params.AddIgnoredActor(this); // ����(ĳ���� ��ü) ����
+
+    // 4. LineTrace ����
     bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params);
+
     AActor* NewInteractable = nullptr;
     if (bHit && Hit.GetActor() && Hit.GetActor()->Implements<UInteractionInterface>())
     {
         NewInteractable = Hit.GetActor();
     }
-    // ??? ???? ???? ???? Cancel ??
+
+    // ����� �ٲ�ų� �þ߿��� ����� Cancel ó��
     if (CurrentInteractable != NewInteractable)
     {
         if (IsInteracting && CurrentInteractable)
@@ -261,6 +363,7 @@ void ATutorialCharacter::TraceForInteractable()
         CurrentInteractable = NewInteractable;
     }
 }
+
 void ATutorialCharacter::StartInteraction()
 {
     if (CurrentInteractable)
@@ -269,6 +372,7 @@ void ATutorialCharacter::StartInteraction()
         IsInteracting = true;
     }
 }
+
 void ATutorialCharacter::CancelInteraction()
 {
     if (IsInteracting && CurrentInteractable)
@@ -277,205 +381,264 @@ void ATutorialCharacter::CancelInteraction()
         IsInteracting = false;
     }
 }
+
 void ATutorialCharacter::PlayHitReaction()
 {
-    // 1. ?? ?????, '?? ???' ???? ?? ?? ? ?
-    if (IsDowned || !bCanBeHit) return;
-    // 2. ?? ???? ?? ?? ??? ??
+    ApplyHitReaction(true);
+}
+
+void ATutorialCharacter::PlayNetworkHitReaction()
+{
+    ApplyHitReaction(false);
+}
+
+void ATutorialCharacter::ForceDownedState()
+{
+    CurrentHealth = 0;
+    IsDowned = true;
     bCanBeHit = false;
-    // 3. ?? ?? ? ??
+
+    if (DownedAnimation)
+    {
+        PlayLoopBodyAnimation(DownedAnimation);
+    }
+    else if (DownedMontage)
+    {
+        PlayAnimMontage(DownedMontage);
+    }
+
+    GetCapsuleComponent()->SetCapsuleHalfHeight(30.0f);
+    GetCharacterMovement()->DisableMovement();
+    bUseControllerRotationYaw = false;
+
+    UE_LOG(LogTemp, Error, TEXT("������ ��� ����(Downed)!"));
+}
+void ATutorialCharacter::ApplyHitReaction(bool bRespectCooldown)
+{
+    if (IsDowned) return;
+    if (bRespectCooldown && !bCanBeHit) return;
+
+    bCanBeHit = false;
     CurrentHealth--;
-    UE_LOG(LogTemp, Warning, TEXT("??? ???! ?? ??: %d"), CurrentHealth);
-    // 4. ??? ?? ?? ??
+    UE_LOG(LogTemp, Warning, TEXT("������ �ǰݵ�! ���� ü��: %d"), CurrentHealth);
+
     if (CurrentHealth > 0)
     {
-        if (HitMontage)
+        if (HitReactionAnimation)
+        {
+            PlayTemporaryBodyAnimation(HitReactionAnimation);
+        }
+        else if (HitMontage)
         {
             PlayAnimMontage(HitMontage);
         }
-        // --- ?? ?? ??? ?? ---
-        // ???? ?? ??? ??? ?? ???(? 0.5?~0.8?) ?? ? ?? ??
+
         FTimerHandle HitCooldownTimer;
         GetWorldTimerManager().SetTimer(HitCooldownTimer, FTimerDelegate::CreateLambda([this]()
             {
                 bCanBeHit = true;
-                UE_LOG(LogTemp, Log, TEXT("??? ?? ?? ?? ? ??"));
+                UE_LOG(LogTemp, Log, TEXT("������ ���� �ٽ� ���� �� ����"));
             }), 1.0f, false);
-        // --------------------------
     }
     else
     {
-        // ? ?? ??: ??(??)
-        IsDowned = true;
-        if (DownedMontage)
-        {
-            PlayAnimMontage(DownedMontage);
-        }
-        GetCapsuleComponent()->SetCapsuleHalfHeight(30.0f);
-        GetCharacterMovement()->DisableMovement();
-        bUseControllerRotationYaw = false;
-        UE_LOG(LogTemp, Error, TEXT("??? ?? ??(Downed)!"));
+        ForceDownedState();
+
     }
 }
+
 void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint)
 {
     UWorld* World = GetWorld();
     if (!World || World->bIsTearingDown) return;
     if (!IsValid(this)) return;
-    // [??] ??? ID(0?)? ? ??? ???? ????? ??? ???? ??? ??? ???.
-    if (PlayerId == 0)
-    {
-        UpdateRemoteKiller(PlayerId, Location, RotationYaw, Forward, Right, bSprint);
-        return;
-    }
-    // 1. ?? ?? ID? ??? ??
+
+    // 1. �ʿ� �ش� ID�� �ִ��� Ȯ��
     if (RemotePlayers.Contains(PlayerId))
     {
-        // ??: Cast ?? ?? ??? ???? ???? ?????.
-        AActor* FoundActor = RemotePlayers[PlayerId];
-        if (IsValid(FoundActor))
+        // �����ϰ� ĳ���ͷ� ����ȯ
+        ATutorialCharacter* Target = Cast<ATutorialCharacter>(RemotePlayers[PlayerId]);
+
+        // [����] Target�� �޸𸮿� ����ֱ⸸ �ϸ� ������Ʈ ����
+        if (IsValid(Target))
         {
-            // ??? ??? ??
-            ATutorialCharacter* Target = Cast<ATutorialCharacter>(FoundActor);
-            // ??? ?? (?? ??? ??? ??)
-            if (Target)
-            {
-                Target->SetActorLocation(Location);
-                Target->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
-                Target->RemoteForwardValue = Forward;
-                Target->RemoteRightValue = Right;
-                Target->RemoteIsSprinting = bSprint;
-                Target->SetActorHiddenInGame(false);
-                Target->GetMesh()->SetHiddenInGame(false, true);
-                Target->GetMesh()->SetVisibility(true, true);
-                Target->GetMesh()->SetOwnerNoSee(false);
-                Target->GetMesh()->SetOnlyOwnerSee(false);
-                return;
-            }
-            else
-            {
-                // ??? ??: ??? ????? ?? ???? ?? ???? ???? ????.
-                UE_LOG(LogTemp, Error, TEXT("ID %d: Cast Failed! This actor is not a Survivor."), PlayerId);
-                RemotePlayers.Remove(PlayerId); // ??? ??? ??
-            }
+            Target->SetActorLocation(Location);
+            Target->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
+
+            Target->RemoteForwardValue = Forward;
+            Target->RemoteRightValue = Right;
+            Target->RemoteIsSprinting = bSprint;
+
+            // ���⼭ �Լ� ���� (���������� ������Ʈ��)
+            return;
         }
         else
         {
+            // ������ �÷��� ������ ������ٸ� �ʿ��� ����
             RemotePlayers.Remove(PlayerId);
         }
     }
-    // 2. ??? ???? ?? ??
-    UClass* ClassToSpawn = nullptr;
-    if (PlayerId == 0)
-    {
-        // KillerClass? ??? ? ?? ????, ??? ?? ??? ??
-        ClassToSpawn = KillerBPClass ? *KillerBPClass : GetClass();
-    }
-    else
-    {
-        ClassToSpawn = SurvivorBPClass ? *SurvivorBPClass : GetClass();
-    }
-    // 2. ?? ???? ??
+
+    // 2. �ʿ� ���ų� Target�� ��ȿ���� ���� ��쿡�� ���� (���Ⱑ else ���� ���� ��)
     FActorSpawnParameters SpawnParams;
-    // Remote proxy actors should not inherit local owner visibility rules.
-    SpawnParams.Owner = nullptr;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    // 3. ??? ClassToSpawn?? ??
-    ATutorialCharacter* NewPlayer = World->SpawnActor<ATutorialCharacter>(ClassToSpawn, Location, FRotator(0.0f, RotationYaw, 0.0f), SpawnParams);
+
+    ATutorialCharacter* NewPlayer = World->SpawnActor<ATutorialCharacter>(GetClass(), Location, FRotator(0.0f, RotationYaw, 0.0f), SpawnParams);
+
     if (NewPlayer)
     {
         NewPlayer->MyPlayerId = PlayerId;
+        // �ʿ� Ȯ���� ���
         NewPlayer->AutoPossessPlayer = EAutoReceiveInput::Disabled;
         NewPlayer->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        NewPlayer->SetActorHiddenInGame(false);
-        NewPlayer->GetMesh()->SetHiddenInGame(false, true);
-        NewPlayer->GetMesh()->SetVisibility(true, true);
-        NewPlayer->GetMesh()->SetOwnerNoSee(false);
-        NewPlayer->GetMesh()->SetOnlyOwnerSee(false);
         NewPlayer->DisableInput(nullptr);
         RemotePlayers.Add(PlayerId, NewPlayer);
-        UE_LOG(LogTemp, Warning, TEXT("%s Spawned! ID: %d"), (PlayerId == 0 ? TEXT("Killer") : TEXT("Survivor")), PlayerId);
+        UE_LOG(LogTemp, Warning, TEXT("New Remote Player Spawned! ID: %d"), PlayerId);
     }
 }
 void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint)
 {
     UWorld* World = GetWorld();
     if (!World || World->bIsTearingDown) return;
+    if (!IsValid(this)) return;
+
     if (RemoteKillers.Contains(PlayerId))
     {
-        AKillerCharacter* Target = RemoteKillers[PlayerId];
+        AKillerCharacter* Target = Cast<AKillerCharacter>(RemoteKillers[PlayerId]);
         if (IsValid(Target))
         {
             Target->SetActorLocation(Location);
             Target->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
-            Target->SetRemoteForwardValue(Forward);
-            Target->SetRemoteRightValue(Right);
-            Target->SetRemoteMovementSpeed(FVector(Forward, Right, 0.0f).Size() * 600.0f);
-            Target->SetActorHiddenInGame(false);
-            Target->GetMesh()->SetHiddenInGame(false, true);
-            Target->GetMesh()->SetVisibility(true, true);
-            Target->GetMesh()->SetOwnerNoSee(false);
-            Target->GetMesh()->SetOnlyOwnerSee(false);
+
             return;
         }
+
         RemoteKillers.Remove(PlayerId);
     }
-    // [??] C++ ???? ?? ????? ??? KillerBPClass? ?????.
-    UClass* ClassToSpawn = KillerBPClass ? *KillerBPClass : AKillerCharacter::StaticClass();
+
     FActorSpawnParameters SpawnParams;
-    // Remote proxy actors should not inherit local owner visibility rules.
-    SpawnParams.Owner = nullptr;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    AKillerCharacter* NewKiller = World->SpawnActor<AKillerCharacter>(ClassToSpawn, Location, FRotator(0.0f, RotationYaw, 0.0f), SpawnParams);
+
+    AKillerCharacter* NewKiller = World->SpawnActor<AKillerCharacter>(AKillerCharacter::StaticClass(), Location, FRotator(0.0f, RotationYaw, 0.0f), SpawnParams);
     if (NewKiller)
     {
         NewKiller->MyPlayerId = PlayerId;
+        NewKiller->AutoPossessPlayer = EAutoReceiveInput::Disabled;
         NewKiller->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        NewKiller->SetRemoteForwardValue(Forward);
-        NewKiller->SetRemoteRightValue(Right);
-        NewKiller->SetRemoteMovementSpeed(FVector(Forward, Right, 0.0f).Size() * 600.0f);
-        NewKiller->SetActorHiddenInGame(false);
-        NewKiller->GetMesh()->SetHiddenInGame(false, true);
-        NewKiller->GetMesh()->SetVisibility(true, true);
-        NewKiller->GetMesh()->SetOwnerNoSee(false);
-        NewKiller->GetMesh()->SetOnlyOwnerSee(false);
+        NewKiller->DisableInput(nullptr);
         RemoteKillers.Add(PlayerId, NewKiller);
-        UE_LOG(LogTemp, Warning, TEXT("Killer Blueprint Spawned! ID: %d"), PlayerId);
+        UE_LOG(LogTemp, Warning, TEXT("New Remote Killer Spawned! ID: %d"), PlayerId);
     }
 }
-void ATutorialCharacter::SwitchToKillerClass()
+void ATutorialCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw)
 {
-    UWorld* World = GetWorld();
-    if (!World) return;
-    // 1. ?? ? ??? ??? ??
-    FVector SpawnLocation = GetActorLocation();
-    FRotator SpawnRotation = GetActorRotation();
-    // 2. ?? ?? ?? ?? ???? ????
-    APlayerController* PC = Cast<APlayerController>(GetController());
-    if (!PC) return;
-    // 3. ??? ????? ???? ???? ??? ??
-    // (????? KillerBPClass ??? ??? BP? ?????? ???)
-    UClass* ClassToSpawn = KillerBPClass ? *KillerBPClass : AKillerCharacter::StaticClass();
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.Owner = nullptr; // ? ???? ???? ???? ??
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    // 4. ??? ??? ??? ?? (?? ?? ????? ????? ??? ?????)
-    AKillerCharacter* NewKiller = World->SpawnActorDeferred<AKillerCharacter>(
-        ClassToSpawn, FTransform(SpawnRotation, SpawnLocation), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-    if (NewKiller)
+    if (ActionType == ACTION_KILLER_ATTACK)
     {
-        NewKiller->NetworkWorker = NetworkWorker;
-        NewKiller->MyPlayerId = MyPlayerId;
-
-        if (NetworkWorker)
+        if (RemoteKillers.Contains(InstigatorId) && IsValid(RemoteKillers[InstigatorId]))
         {
-            NetworkWorker->SetOwnerKiller(NewKiller);
-            NetworkWorker = nullptr;
+            RemoteKillers[InstigatorId]->SetActorLocation(Location);
+            RemoteKillers[InstigatorId]->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
+            RemoteKillers[InstigatorId]->StartAttack();
+        }
+        return;
+    }
+
+    if (ActionType == ACTION_SURVIVOR_HIT)
+    {
+        const bool bForceDown = TargetId < 0;
+        const int32 RealTargetId = bForceDown ? -TargetId : TargetId;
+
+        if (RealTargetId == MyPlayerId || (RealTargetId > 0 && !RemotePlayers.Contains(RealTargetId)))
+        {
+            if (bForceDown)
+            {
+                ForceDownedState();
+            }
+            else
+            {
+                PlayNetworkHitReaction();
+            }
+        }
+        else if (RemotePlayers.Contains(RealTargetId) && IsValid(RemotePlayers[RealTargetId]))
+        {
+            if (bForceDown)
+            {
+                RemotePlayers[RealTargetId]->ForceDownedState();
+            }
+            else
+            {
+                RemotePlayers[RealTargetId]->PlayNetworkHitReaction();
+            }
+        }
+        return;
+    }
+
+    if (ActionType == ACTION_SURVIVOR_PICKUP)
+    {
+        AKillerCharacter* Killer = nullptr;
+        if (RemoteKillers.Contains(InstigatorId) && IsValid(RemoteKillers[InstigatorId]))
+        {
+            Killer = RemoteKillers[InstigatorId];
         }
 
-        NewKiller->FinishSpawning(FTransform(SpawnRotation, SpawnLocation));
-        PC->Possess(NewKiller);
+        ATutorialCharacter* Survivor = nullptr;
+        if (TargetId == MyPlayerId)
+        {
+            Survivor = this;
+        }
+        else if (RemotePlayers.Contains(TargetId) && IsValid(RemotePlayers[TargetId]))
+        {
+            Survivor = RemotePlayers[TargetId];
+        }
 
-        this->Destroy();
+        if (Killer && Survivor)
+        {
+            Survivor->IsBeingCarried = true;
+            Survivor->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            Survivor->GetCharacterMovement()->DisableMovement();
+            Survivor->AttachToComponent(Killer->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("CarrySocket"));
+            Killer->PlayCarryAnimation();
+        }
+    }
+}
+
+void ATutorialCharacter::PlayTemporaryBodyAnimation(UAnimSequence* Animation)
+{
+    if (!Animation || !GetMesh())
+    {
+        return;
+    }
+
+    GetMesh()->PlayAnimation(Animation, false);
+
+    FTimerHandle RestoreAnimTimer;
+    GetWorldTimerManager().SetTimer(
+        RestoreAnimTimer,
+        this,
+        &ATutorialCharacter::RestoreBodyAnimClass,
+        Animation->GetPlayLength(),
+        false
+    );
+}
+
+void ATutorialCharacter::PlayLoopBodyAnimation(UAnimSequence* Animation)
+{
+    if (!Animation || !GetMesh())
+    {
+        return;
+    }
+
+    GetMesh()->PlayAnimation(Animation, true);
+}
+
+void ATutorialCharacter::RestoreBodyAnimClass()
+{
+    if (GetMesh() && !IsDowned && !IsBeingCarried)
+    {
+        if (UClass* SurvivorAnimClass = LoadClass<UAnimInstance>(nullptr, TEXT("/Game/BP/ABP_TutorialAnim.ABP_TutorialAnim_C")))
+        {
+            GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+            GetMesh()->SetAnimInstanceClass(SurvivorAnimClass);
+        }
     }
 }

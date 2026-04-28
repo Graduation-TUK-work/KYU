@@ -14,8 +14,15 @@ typedef int32_t int32;
 enum EPacketType : uint8 {
     PKT_JOIN = 1,
     PKT_MOVE = 2,
+    PKT_ACTION = 3,
 };
 
+
+enum EActionType : uint8 {
+    ACTION_KILLER_ATTACK = 1,
+    ACTION_SURVIVOR_HIT = 2,
+    ACTION_SURVIVOR_PICKUP = 3,
+};
 enum ECharacterType : uint8 {
     CHARACTER_SURVIVOR = 1,
     CHARACTER_KILLER = 2,
@@ -41,4 +48,13 @@ struct FPacketMove {
     FPlayerData Data;
 };
 
+
+struct FPacketAction {
+    uint8 Type;
+    uint8 ActionType;
+    int32 InstigatorId;
+    int32 TargetId;
+    float X, Y, Z;
+    float RotationYaw;
+};
 #pragma pack(pop)
