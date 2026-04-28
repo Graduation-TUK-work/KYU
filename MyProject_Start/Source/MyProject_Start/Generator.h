@@ -19,9 +19,13 @@ public:
     virtual void CompleteInteract_Implementation() override;
     virtual float GetInteractDuration_Implementation() const override;
 
+    UPROPERTY(VisibleAnywhere, Category = "Generator")
+    bool bIsRepaired = false;
+
 protected:
     virtual void BeginPlay() override;
-
+    UPROPERTY()
+    class ACharacter* CurrentInteractor;
 private:
     // 수리 진행도 (0.0 ~ 1.0)
     UPROPERTY(VisibleAnywhere, Category = "Generator")
@@ -30,10 +34,6 @@ private:
     // 총 수리 시간
     UPROPERTY(EditAnywhere, Category = "Generator")
     float RepairDuration = 80.f;
-
-    // 수리 완료 여부
-    UPROPERTY(VisibleAnywhere, Category = "Generator")
-    bool bIsRepaired = false;
 
     // 현재 수리 중인지
     bool bIsBeingRepaired = false;

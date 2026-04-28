@@ -14,6 +14,7 @@
 #include "MyProject_Start/InteractionInterface.h"
 #include "MyProject_Start/NetworkWorker.h" // �߰�
 #include "MyProject_Start/KillerCharacter.h"
+#include "MyProject_Start/Generator.h"
 #include "Networking.h"    // �߰�
 #include "Sockets.h"       // �߰�
 
@@ -159,6 +160,18 @@ void ATutorialCharacter::Tick(float DeltaTime)
 
     if (IsInteracting && CurrentInteractable)
     {
+        // [추가된 로직] 대상이 발전기인데 이미 수리가 끝났다면?
+        if (AGenerator* Generator = Cast<AGenerator>(CurrentInteractable))
+        {
+            if (Generator->bIsRepaired)
+            {
+                // 강제로 상호작용 중단
+                CancelInteraction();
+                return;
+            }
+        }
+
+        // 수리가 안 끝났을 때만 업데이트 실행
         IInteractionInterface::Execute_UpdateInteract(CurrentInteractable, DeltaTime);
     }
 
@@ -193,32 +206,22 @@ void ATutorialCharacter::SendLocationToServer()
         MovePkt.Data.PlayerId = MyPlayerId;
         MovePkt.Data.CharacterType = CHARACTER_SURVIVOR;
 
-        // ��ġ ����
+        // 1. 위치 및 회전 세팅
         FVector CurLocation = GetActorLocation();
         MovePkt.Data.X = CurLocation.X;
         MovePkt.Data.Y = CurLocation.Y;
         MovePkt.Data.Z = CurLocation.Z;
         MovePkt.Data.RotationYaw = GetActorRotation().Yaw;
 
-        FVector Velocity2D = GetVelocity();
-        Velocity2D.Z = 0.0f;
-        if (Velocity2D.SizeSquared() > 1.0f)
-        {
-            const FVector MoveDir = Velocity2D.GetSafeNormal();
-            FVector ActorForward = GetActorForwardVector();
-            FVector ActorRight = GetActorRightVector();
-            ActorForward.Z = 0.0f;
-            ActorRight.Z = 0.0f;
-            MovePkt.Data.ForwardValue = FVector::DotProduct(MoveDir, ActorForward.GetSafeNormal());
-            MovePkt.Data.RightValue = FVector::DotProduct(MoveDir, ActorRight.GetSafeNormal());
-        }
-        else
-        {
-            MovePkt.Data.ForwardValue = 0.0f;
-            MovePkt.Data.RightValue = 0.0f;
-        }
-        MovePkt.Data.bIsSprinting = (GetCharacterMovement()->MaxWalkSpeed > 600.0f);
+        // 2. [수정된 부분] 복잡한 속도 계산을 지우고, 입력값을 그대로 넣습니다!
+        MovePkt.Data.ForwardValue = MoveForwardValue;
+        MovePkt.Data.RightValue = MoveRightValue;
 
+        // 3. 달리기 상태 세팅 (기존 코드 유지)
+        MovePkt.Data.bIsSprinting = (GetCharacterMovement()->MaxWalkSpeed > 350.0f);
+
+
+        // 4. 서버로 전송
         int32 BytesSent = 0;
         NetworkWorker->GetSocket()->Send((uint8*)&MovePkt, sizeof(FPacketMove), BytesSent);
     }
@@ -269,13 +272,13 @@ void ATutorialCharacter::MoveRight(float Value)
 void ATutorialCharacter::BeginSprint()
 {
     // ���� 1000���� 150 ������ 850 ����
-    GetCharacterMovement()->MaxWalkSpeed = 850.0f;
+    GetCharacterMovement()->MaxWalkSpeed = 350.0f;
 }
 
 void ATutorialCharacter::EndSprint()
 {
     // ���� 600���� 150 ������ 450 ����
-    GetCharacterMovement()->MaxWalkSpeed = 450.0f;
+    GetCharacterMovement()->MaxWalkSpeed = 350.0f;
 }
 
 void ATutorialCharacter::Turn(float Value) { AddControllerYawInput(Value); }
@@ -368,6 +371,16 @@ void ATutorialCharacter::StartInteraction()
 {
     if (CurrentInteractable)
     {
+        // [추가된 로직] 이미 수리된 발전기인지 확인
+        if (AGenerator* Generator = Cast<AGenerator>(CurrentInteractable))
+        {
+            if (Generator->bIsRepaired)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("This generator is already done!"));
+                return; // 함수 종료
+            }
+        }
+
         IInteractionInterface::Execute_StartInteract(CurrentInteractable, this);
         IsInteracting = true;
     }
@@ -510,6 +523,13 @@ void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, fl
             Target->SetActorLocation(Location);
             Target->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
 
+            // =========================================================
+            // [핵심 추가] 서버에서 받은 애니메이션 입력값을 킬러에게 주입!
+            // =========================================================
+            Target->RemoteForwardValue = Forward;
+            Target->RemoteRightValue = Right;
+            Target->RemoteMovementSpeed = FVector2D(Forward, Right).Size() * 400.0f;
+
             return;
         }
 
@@ -523,6 +543,14 @@ void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, fl
     if (NewKiller)
     {
         NewKiller->MyPlayerId = PlayerId;
+
+        // =========================================================
+        // [핵심 추가] 처음 스폰될 때도 초기 이동 값을 넣어줍니다.
+        // =========================================================
+        NewKiller->RemoteForwardValue = Forward;
+        NewKiller->RemoteRightValue = Right;
+        NewKiller->RemoteMovementSpeed = FVector2D(Forward, Right).Size() * 400.0f;
+
         NewKiller->AutoPossessPlayer = EAutoReceiveInput::Disabled;
         NewKiller->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         NewKiller->DisableInput(nullptr);
@@ -530,6 +558,7 @@ void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, fl
         UE_LOG(LogTemp, Warning, TEXT("New Remote Killer Spawned! ID: %d"), PlayerId);
     }
 }
+
 void ATutorialCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw)
 {
     if (ActionType == ACTION_KILLER_ATTACK)

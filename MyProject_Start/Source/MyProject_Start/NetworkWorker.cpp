@@ -126,15 +126,66 @@ uint32 FNetworkWorker::Run()
 
                     AsyncTask(ENamedThreads::GameThread, [this, AssignedId = JoinPkt->MyId]()
                         {
-                            if (IsValid(OwnerTutorialCharacter))
+                            // 1. 내가 서버의 첫 접속자(ID: 0)라서 살인마로 지정되었다면!
+                            if (AssignedId == 0)
                             {
-                                OwnerTutorialCharacter->MyPlayerId = AssignedId;
-                                UE_LOG(LogTemp, Warning, TEXT("Assigned survivor ID: %d"), AssignedId);
+                                if (IsValid(OwnerTutorialCharacter))
+                                {
+                                    UWorld* World = OwnerTutorialCharacter->GetWorld();
+                                    APlayerController* PC = Cast<APlayerController>(OwnerTutorialCharacter->GetController());
+
+                                    if (World && PC)
+                                    {
+                                        FVector SpawnLoc = OwnerTutorialCharacter->GetActorLocation();
+                                        FRotator SpawnRot = OwnerTutorialCharacter->GetActorRotation();
+                                        FTransform SpawnTransform(SpawnRot, SpawnLoc);
+
+                                        // 살인마 스폰 (BeginPlay가 실행되기 전에 잠깐 멈춤 상태로 스폰)
+                                        AKillerCharacter* NewKiller = World->SpawnActorDeferred<AKillerCharacter>(AKillerCharacter::StaticClass(), SpawnTransform);
+                                        if (NewKiller)
+                                        {
+                                            // 생존자가 쓰던 통신망(NetworkWorker)을 살인마에게 그대로 물려줌
+                                            NewKiller->NetworkWorker = this;
+                                            NewKiller->MyPlayerId = AssignedId;
+
+                                            // 스폰 완료 및 빙의 (Possess)
+                                            NewKiller->FinishSpawning(SpawnTransform);
+                                            PC->Possess(NewKiller);
+
+                                            // =====================================================================
+                                            // [크래시 해결] 널 포인터 참조 및 스레드 강제 종료 방지 로직 적용
+                                            // =====================================================================
+                                            ATutorialCharacter* OldSurvivor = OwnerTutorialCharacter;
+
+                                            // 소유권을 살인마로 먼저 안전하게 변경 (이 순간 OwnerTutorialCharacter는 nullptr이 됨)
+                                            this->SetOwnerKiller(NewKiller);
+
+                                            // 백업해둔 기존 생존자 안전하게 삭제
+                                            if (OldSurvivor)
+                                            {
+                                                // 생존자의 EndPlay가 호출될 때 통신망 연결이 끊기는 것을 방지
+                                                OldSurvivor->NetworkWorker = nullptr;
+                                                OldSurvivor->Destroy();
+                                            }
+                                            // =====================================================================
+
+                                            UE_LOG(LogTemp, Warning, TEXT("Swapped to Killer! Assigned ID: %d"), AssignedId);
+                                        }
+                                    }
+                                }
                             }
-                            else if (IsValid(OwnerKillerCharacter))
+                            // 2. 내가 생존자(ID 1 이상)로 지정되었다면 기존 생존자 몸통 유지
+                            else
                             {
-                                OwnerKillerCharacter->MyPlayerId = AssignedId;
-                                UE_LOG(LogTemp, Warning, TEXT("Assigned killer ID: %d"), AssignedId);
+                                if (IsValid(OwnerTutorialCharacter))
+                                {
+                                    OwnerTutorialCharacter->MyPlayerId = AssignedId;
+                                    UE_LOG(LogTemp, Warning, TEXT("Assigned survivor ID: %d"), AssignedId);
+                                }
+                                else if (IsValid(OwnerKillerCharacter))
+                                {
+                                    OwnerKillerCharacter->MyPlayerId = AssignedId;
+                                }
                             }
                         });
                 }

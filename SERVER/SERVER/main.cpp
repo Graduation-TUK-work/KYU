@@ -31,6 +31,11 @@ struct PlayerInfo {
     float X, Y, Z;
     float RotationYaw;
     uint8 CharacterType; // 1: 생존자, 2: 살인마
+
+    // --- 추가된 부분 ---
+    float ForwardValue;
+    float RightValue;
+    bool bIsSprinting;
 };
 
 map<int32, PlayerInfo> g_playerDataMap;
@@ -90,11 +95,30 @@ DWORD WINAPI WorkerThread(LPVOID lpParam) {
                     g_playerDataMap[id].Z = movePkt->Data.Z;
                     g_playerDataMap[id].RotationYaw = movePkt->Data.RotationYaw;
                     g_playerDataMap[id].CharacterType = movePkt->Data.CharacterType;
+
+                    // --- 추가된 부분 ---
+                    g_playerDataMap[id].ForwardValue = movePkt->Data.ForwardValue;
+                    g_playerDataMap[id].RightValue = movePkt->Data.RightValue;
+                    g_playerDataMap[id].bIsSprinting = movePkt->Data.bIsSprinting;
                 }
-                // 다른 모든 클라이언트에게 위치 전송
+                // 다른 모든 클라이언트에게 위치 전송 (이건 원래 잘 작동하고 있었습니다)
                 Broadcast(pContext->buffer, sizeof(FPacketMove), pSession);
-                break;
             }
+                         break;
+            break;
+            case PKT_ACTION:
+            {
+                // 2. 액션 패킷으로 캐스팅
+                FPacketAction* actionPkt = (FPacketAction*)pContext->buffer;
+
+                // 서버 콘솔에 로그 출력 (확인용)
+                cout << "[Action] ID " << actionPkt->InstigatorId
+                    << " performed Action: " << (int)actionPkt->ActionType << endl;
+
+                // 3. 모든 클라이언트에게 액션 중계 (Broadcast)
+                Broadcast((char*)actionPkt, sizeof(FPacketAction), pSession);
+            }
+            break;
             }
 
             // 재수신 예약
@@ -134,7 +158,7 @@ int main() {
     while (true) {
         SOCKADDR_IN clientAddr;
         int addrLen = sizeof(clientAddr);
-        SOCKET clientSocket = accept(listenSocket, (SOCKADDR*)&clientAddr, &addrLen);
+        SOCKET clientSocket = accept(listenSocket, (SOCKADDR*)&clientAddr,  &addrLen);
 
         if (clientSocket != INVALID_SOCKET) {
             cout << "[접속] 새로운 언리얼 클라이언트 연결!" << endl;
@@ -179,7 +203,7 @@ int main() {
                 lock_guard<mutex> lock(g_dataLock);
                 for (auto it = g_playerDataMap.begin(); it != g_playerDataMap.end(); ++it)
                 {
-                    if (it->first == joinPkt.MyId) continue; // 방금 들어온 본인 정보는 패스
+                    if (it->first == joinPkt.MyId) continue;
 
                     FPacketMove oldPlayerPkt;
                     memset(&oldPlayerPkt, 0, sizeof(oldPlayerPkt));
@@ -190,6 +214,11 @@ int main() {
                     oldPlayerPkt.Data.Y = it->second.Y;
                     oldPlayerPkt.Data.Z = it->second.Z;
                     oldPlayerPkt.Data.RotationYaw = it->second.RotationYaw;
+
+                    // --- 추가된 부분 ---
+                    oldPlayerPkt.Data.ForwardValue = it->second.ForwardValue;
+                    oldPlayerPkt.Data.RightValue = it->second.RightValue;
+                    oldPlayerPkt.Data.bIsSprinting = it->second.bIsSprinting;
 
                     send(clientSocket, (char*)&oldPlayerPkt, sizeof(oldPlayerPkt), 0);
                 }
