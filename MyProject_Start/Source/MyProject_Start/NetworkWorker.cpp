@@ -4,8 +4,9 @@
 #include "SocketSubsystem.h"
 #include "Misc/ConfigCacheIni.h"
 #include "MyProject_Start/Player/TutorialCharacter.h"
+#include "SpawnPoint.h"
 #include "MyProject_Start/KillerCharacter.h"
-
+#include "Kismet/GameplayStatics.h"
 namespace
 {
     constexpr TCHAR NetworkConfigSection[] = TEXT("/Script/MyProject_Start.NetworkSettings");
@@ -29,7 +30,16 @@ FNetworkWorker::FNetworkWorker(FString IP, int32 Port)
 
 FString FNetworkWorker::GetDefaultServerIP()
 {
-    FString ConfiguredIP = DefaultServerIp;
+    FString ConfiguredIP = DefaultServerIp; // 기본값 127.0.0.1
+
+    // [핵심 추가] 실행할 때 넘겨준 -IP= 주소가 있는지 먼저 확인합니다.
+    if (FParse::Value(FCommandLine::Get(), TEXT("-IP="), ConfiguredIP))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Command Line IP Found: %s"), *ConfiguredIP);
+        return ConfiguredIP;
+    }
+
+    // 기존 INI 로직 (만약을 위해 남겨둠)
     if (GConfig)
     {
         GConfig->GetString(NetworkConfigSection, ServerIpKey, ConfiguredIP, GGameIni);
@@ -136,11 +146,24 @@ uint32 FNetworkWorker::Run()
 
                                     if (World && PC)
                                     {
-                                        FVector SpawnLoc = OwnerTutorialCharacter->GetActorLocation();
-                                        FRotator SpawnRot = OwnerTutorialCharacter->GetActorRotation();
-                                        FTransform SpawnTransform(SpawnRot, SpawnLoc);
+                                        // ---- [수정된 부분: SpawnPoint 찾기] ----
+                                        FTransform SpawnTransform = OwnerTutorialCharacter->GetActorTransform(); // 기본값: 현재 위치
 
-                                        // 살인마 스폰 (BeginPlay가 실행되기 전에 잠깐 멈춤 상태로 스폰)
+                                        TArray<AActor*> FoundPoints;
+                                        UGameplayStatics::GetAllActorsOfClass(World, ASpawnPoint::StaticClass(), FoundPoints);
+
+                                        for (AActor* Point : FoundPoints)
+                                        {
+                                            ASpawnPoint* SP = Cast<ASpawnPoint>(Point);
+                                            if (SP && SP->SpawnTeam == ETeamType::Killer) // 킬러용 스폰 포인트를 찾으면
+                                            {
+                                                SpawnTransform = SP->GetActorTransform();
+                                                break; // 찾았으니 루프 종료
+                                            }
+                                        }
+                                        // ----------------------------------------
+
+                                        // 살인마 스폰 (찾아낸 SpawnTransform 위치에서 스폰)
                                         AKillerCharacter* NewKiller = World->SpawnActorDeferred<AKillerCharacter>(AKillerCharacter::StaticClass(), SpawnTransform);
                                         if (NewKiller)
                                         {
@@ -152,35 +175,46 @@ uint32 FNetworkWorker::Run()
                                             NewKiller->FinishSpawning(SpawnTransform);
                                             PC->Possess(NewKiller);
 
-                                            // =====================================================================
-                                            // [크래시 해결] 널 포인터 참조 및 스레드 강제 종료 방지 로직 적용
-                                            // =====================================================================
+                                            // --- 기존에 작성하신 기존 생존자 안전 삭제 로직 유지 ---
                                             ATutorialCharacter* OldSurvivor = OwnerTutorialCharacter;
-
-                                            // 소유권을 살인마로 먼저 안전하게 변경 (이 순간 OwnerTutorialCharacter는 nullptr이 됨)
                                             this->SetOwnerKiller(NewKiller);
-
-                                            // 백업해둔 기존 생존자 안전하게 삭제
                                             if (OldSurvivor)
                                             {
-                                                // 생존자의 EndPlay가 호출될 때 통신망 연결이 끊기는 것을 방지
                                                 OldSurvivor->NetworkWorker = nullptr;
                                                 OldSurvivor->Destroy();
                                             }
-                                            // =====================================================================
 
-                                            UE_LOG(LogTemp, Warning, TEXT("Swapped to Killer! Assigned ID: %d"), AssignedId);
+                                            UE_LOG(LogTemp, Warning, TEXT("Swapped to Killer at SpawnPoint! Assigned ID: %d"), AssignedId);
                                         }
                                     }
                                 }
                             }
-                            // 2. 내가 생존자(ID 1 이상)로 지정되었다면 기존 생존자 몸통 유지
+                            // 2. 내가 생존자(ID 1 이상)로 지정되었다면
                             else
                             {
                                 if (IsValid(OwnerTutorialCharacter))
                                 {
                                     OwnerTutorialCharacter->MyPlayerId = AssignedId;
                                     UE_LOG(LogTemp, Warning, TEXT("Assigned survivor ID: %d"), AssignedId);
+
+                                    // ---- [생존자도 스폰 위치로 이동시키고 싶다면 추가] ----
+                                    UWorld* World = OwnerTutorialCharacter->GetWorld();
+                                    if (World)
+                                    {
+                                        TArray<AActor*> FoundPoints;
+                                        UGameplayStatics::GetAllActorsOfClass(World, ASpawnPoint::StaticClass(), FoundPoints);
+                                        for (AActor* Point : FoundPoints)
+                                        {
+                                            ASpawnPoint* SP = Cast<ASpawnPoint>(Point);
+                                            if (SP && SP->SpawnTeam == ETeamType::Survivor) // 생존자용 스폰 포인트를 찾으면
+                                            {
+                                                // 새로 스폰할 필요 없이 기존 몸통을 해당 위치로 순간이동
+                                                OwnerTutorialCharacter->SetActorTransform(SP->GetActorTransform(), false, nullptr, ETeleportType::TeleportPhysics);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    // -------------------------------------------------------
                                 }
                                 else if (IsValid(OwnerKillerCharacter))
                                 {

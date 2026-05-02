@@ -28,6 +28,8 @@ void UTutorialAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 				Vertical = Character->RemoteForwardValue;
 				Horizontal = Character->RemoteRightValue;
 			}
+
+			bIsRepairingGenerator = Character->bIsRepairingGenerator;
 		}
 	}
 }

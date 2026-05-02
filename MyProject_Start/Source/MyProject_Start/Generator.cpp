@@ -1,4 +1,5 @@
 #include "Generator.h"
+#include "Algo/Sort.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "MyProject_Start/MyGameModeBase.h"
@@ -6,36 +7,51 @@
 AGenerator::AGenerator()
 {
     PrimaryActorTick.bCanEverTick = false;
+    SetReplicates(true);
     bIsRepaired = false;
     bIsBeingRepaired = false;
     RepairProgress = 0.0f;
     RepairDuration = 5.0f;
-    CurrentInteractor = nullptr; // 초기화
+    CurrentInteractor = nullptr;
 }
 
 void AGenerator::BeginPlay()
 {
     Super::BeginPlay();
+    AssignGeneratedIdIfNeeded();
 
-    // 초기화 확인용 로그 (선택 사항)
-    UE_LOG(LogTemp, Warning, TEXT("Generator Spawned and Ready."));
+    UE_LOG(LogTemp, Warning, TEXT("Generator Spawned and Ready. ID: %d"), GeneratorId);
+}
+
+int32 AGenerator::GetGeneratorId() const
+{
+    return GeneratorId;
+}
+
+float AGenerator::GetRepairProgress() const
+{
+    return RepairProgress;
+}
+
+bool AGenerator::IsBeingRepaired() const
+{
+    return bIsBeingRepaired;
 }
 
 void AGenerator::StartInteract_Implementation(ACharacter* Interactor)
 {
     if (bIsRepaired) return;
 
-    bIsBeingRepaired = true;
-    CurrentInteractor = Interactor; // 누가 수리 시작했는지 기억
+    SetRepairState(true, false, RepairProgress);
+    CurrentInteractor = Interactor;
 }
 
 void AGenerator::UpdateInteract_Implementation(float DeltaTime)
 {
-    // 이미 완료되었거나 수리 중이 아니면 실행 안 함
     if (!bIsBeingRepaired || bIsRepaired) return;
 
-    RepairProgress += DeltaTime / RepairDuration;
-    RepairProgress = FMath::Clamp(RepairProgress, 0.f, 1.f);
+    const float NewRepairProgress = FMath::Clamp(RepairProgress + (DeltaTime / RepairDuration), 0.f, 1.f);
+    SetRepairState(true, false, NewRepairProgress);
 
     if (RepairProgress >= 1.f)
     {
@@ -54,23 +70,15 @@ void AGenerator::CompleteInteract_Implementation()
 {
     if (bIsRepaired) return;
 
-    bIsBeingRepaired = false;
-    bIsRepaired = true;
+    SetRepairState(false, true, 1.f);
 
-    UE_LOG(LogTemp, Warning, TEXT("Generator repaired!"));
+    UE_LOG(LogTemp, Warning, TEXT("Generator repaired! ID: %d"), GeneratorId);
 
-    // [핵심 추가] 수리하던 캐릭터가 있다면 강제로 상호작용 중단시키기
     if (CurrentInteractor)
     {
-        // 캐릭터가 상호작용 인터페이스를 가지고 있다면 상호작용 종료 함수 호출
-        // 보통 캐릭터의 상호작용 상태를 Reset 해주는 로직이 필요합니다.
-        // 회원님의 캐릭터 클래스에 상호작용 중단 함수가 있다면 여기서 호출하세요.
-        // 예: Cast<ITutorialInterface>(CurrentInteractor)->StopInteraction();
-
         CurrentInteractor = nullptr;
     }
 
-    // 게임 모드 보고
     AMyGameModeBase* GM = Cast<AMyGameModeBase>(UGameplayStatics::GetGameMode(GetWorld()));
     if (GM)
     {
@@ -82,12 +90,61 @@ void AGenerator::CancelInteract_Implementation()
 {
     if (bIsRepaired) return;
 
-    bIsBeingRepaired = false;
-    CurrentInteractor = nullptr; // 손 뗌
-    UE_LOG(LogTemp, Warning, TEXT("Generator repair cancelled. Progress: %.2f"), RepairProgress);
+    SetRepairState(false, false, RepairProgress);
+    CurrentInteractor = nullptr;
+    UE_LOG(LogTemp, Warning, TEXT("Generator repair cancelled. ID: %d Progress: %.2f"), GeneratorId, RepairProgress);
 }
 
 float AGenerator::GetInteractDuration_Implementation() const
 {
     return RepairDuration;
+}
+
+void AGenerator::ApplyNetworkRepairState(bool bInBeingRepaired, bool bInRepaired, float InRepairProgress)
+{
+    SetRepairState(bInBeingRepaired, bInRepaired, InRepairProgress);
+
+    if (!bInBeingRepaired)
+    {
+        CurrentInteractor = nullptr;
+    }
+}
+
+void AGenerator::AssignGeneratedIdIfNeeded()
+{
+    if (GeneratorId >= 0 || !GetWorld())
+    {
+        return;
+    }
+
+    TArray<AActor*> FoundGenerators;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), AGenerator::StaticClass(), FoundGenerators);
+
+    Algo::Sort(FoundGenerators, [](const AActor* Left, const AActor* Right)
+        {
+            return Left && Right && Left->GetName() < Right->GetName();
+        });
+
+    GeneratorId = FoundGenerators.IndexOfByKey(this);
+}
+
+void AGenerator::SetRepairState(bool bInBeingRepaired, bool bInRepaired, float InRepairProgress)
+{
+    const bool bWasBeingRepaired = bIsBeingRepaired;
+    const bool bWasRepaired = bIsRepaired;
+    const float OldRepairProgress = RepairProgress;
+
+    bIsBeingRepaired = bInBeingRepaired;
+    bIsRepaired = bInRepaired;
+    RepairProgress = FMath::Clamp(InRepairProgress, 0.f, 1.f);
+
+    if (bWasBeingRepaired != bIsBeingRepaired || bWasRepaired != bIsRepaired || !FMath::IsNearlyEqual(OldRepairProgress, RepairProgress))
+    {
+        OnRepairStateChanged(bIsBeingRepaired, bIsRepaired, RepairProgress);
+    }
+
+    if (!bWasRepaired && bIsRepaired)
+    {
+        OnRepairCompleted();
+    }
 }

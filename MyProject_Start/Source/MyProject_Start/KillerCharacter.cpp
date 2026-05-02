@@ -1,4 +1,4 @@
-#include "KillerCharacter.h"
+﻿#include "KillerCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -9,6 +9,8 @@
 #include "UObject/ConstructorHelpers.h"
 #include "MyProject_Start/Player/TutorialCharacter.h"
 #include "MyProject_Start/NetworkWorker.h"
+#include "MyProject_Start/Generator.h"
+#include "Kismet/GameplayStatics.h"
 #include "Networking.h"
 #include "Sockets.h"
 
@@ -31,6 +33,18 @@ AKillerCharacter::AKillerCharacter()
     FPSMesh->CastShadow = false;
 
     FPSMesh->BoundsScale = 5.0f;
+    FPSMesh->SetHiddenInGame(false);
+    FPSMesh->SetRelativeLocation(FirstPersonArmOffset);
+    FPSMesh->SetRelativeRotation(FirstPersonArmRotation);
+
+    static ConstructorHelpers::FObjectFinder<USkeletalMesh> FirstPersonArmMesh(
+        TEXT("/Script/Engine.SkeletalMesh'/Game/Animation/zombi/zombi_Arm.zombi_Arm'")
+    );
+    if (FirstPersonArmMesh.Succeeded())
+    {
+        FPSMesh->SetSkeletalMesh(FirstPersonArmMesh.Object);
+        FPSMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+    }
     GetMesh()->SetRelativeLocationAndRotation(
         FVector(0.0f, 0.0f, -88.0f),
         FRotator(0.0f, -90.0f, 0.0f)
@@ -53,6 +67,14 @@ AKillerCharacter::AKillerCharacter()
         AttackMontage = AttackMontageAsset.Object;
     }
 
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> FirstPersonAttackAnimationAsset(
+        TEXT("/Script/Engine.AnimSequence'/Game/Animation/zombi/arm_Attack.arm_Attack'")
+    );
+    if (FirstPersonAttackAnimationAsset.Succeeded())
+    {
+        FirstPersonAttackAnimation = FirstPersonAttackAnimationAsset.Object;
+    }
+
     static ConstructorHelpers::FObjectFinder<UAnimSequence> BodyAttackAnimationAsset(
         TEXT("/Script/Engine.AnimSequence'/Game/Animation/zombi/atack.atack'")
     );
@@ -69,10 +91,10 @@ AKillerCharacter::AKillerCharacter()
         CarryAnimation = CarryAnimationAsset.Object;
     }
 
-    // 3��Ī �ٵ�� �ڽſ��� ������ �ʰ� ����
+    // 3占쏙옙칭 占쌕듸옙占?占쌘신울옙占쏙옙 占쏙옙占쏙옙占쏙옙 占십곤옙 占쏙옙占쏙옙
     GetMesh()->SetOwnerNoSee(true);
 
-    // ���� ���� ���� �ʱ�ȭ
+    // 占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙 占십깍옙화
     bIsAttacking = false;
 
 
@@ -103,8 +125,6 @@ void AKillerCharacter::BeginPlay()
         RemoteKillers.Empty();
         RemoteSurvivors.Empty();
 
-        // [수정된 부분] NetworkWorker가 아직 없을 때만 새로 생성합니다.
-        // 생존자에서 변신(Swap)해서 넘어온 경우 이미 채워져 있으므로 건너뜁니다.
         if (NetworkWorker == nullptr)
         {
             NetworkWorker = new FNetworkWorker(FNetworkWorker::GetDefaultServerIP(), FNetworkWorker::GetDefaultServerPort());
@@ -134,7 +154,7 @@ void AKillerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AKillerCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-    // 1. ���� �̵� �ӵ� ��� (XY ������ �ӵ��� ����)
+
     FVector Velocity = GetVelocity();
     FVector LateralVelocity = FVector(Velocity.X, Velocity.Y, 0.f);
     MovementSpeed = LateralVelocity.Size();
@@ -149,13 +169,10 @@ void AKillerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-    // �̵� �� �ü� ó��
     PlayerInputComponent->BindAxis("MoveForward", this, &AKillerCharacter::MoveForward);
     PlayerInputComponent->BindAxis("MoveRight", this, &AKillerCharacter::MoveRight);
     PlayerInputComponent->BindAxis("TurnCamera", this, &AKillerCharacter::AddControllerYawInput);
     PlayerInputComponent->BindAxis("LookUp", this, &AKillerCharacter::AddControllerPitchInput);
-
-    // ���� �Է� ���ε� (������Ʈ ���� - �Է¿� "Attack"�� ��ϵǾ� �־�� �մϴ�)
     PlayerInputComponent->BindAction("Attack", IE_Pressed, this, &AKillerCharacter::StartAttack);
     PlayerInputComponent->BindAction("Pickup", IE_Pressed, this, &AKillerCharacter::PickupSurvivor);
 }
@@ -187,19 +204,20 @@ void AKillerCharacter::MoveRight(float AxisValue)
 void AKillerCharacter::StartAttack()
 {
     if (bIsAttacking) return;
-    if (!AttackMontage && !BodyAttackAnimation) return;
+    if (!AttackMontage && !BodyAttackAnimation && !FirstPersonAttackAnimation) return;
 
     bIsAttacking = true;
     bHasDealtDamage = false;
-
-    // 공격 시 살인마 이동 속도 감소 (공격 경직)
     GetCharacterMovement()->MaxWalkSpeed = 100.0f;
 
-    // 1. 내가 직접 조종하는 살인마일 경우
     if (IsPlayerControlled() && IsLocallyControlled())
     {
-        // 1인칭 팔 애니메이션 재생
-        if (FPSMesh && AttackMontage)
+        if (FPSMesh && FirstPersonAttackAnimation)
+        {
+            FPSMesh->SetHiddenInGame(false);
+            FPSMesh->PlayAnimation(FirstPersonAttackAnimation, false);
+        }
+        else if (FPSMesh && AttackMontage)
         {
             if (UAnimInstance* FPSAnimInstance = FPSMesh->GetAnimInstance())
             {
@@ -207,26 +225,21 @@ void AKillerCharacter::StartAttack()
             }
         }
 
-        // 서버로 "나 공격한다" 패킷 전송
         SendActionToServer(ACTION_KILLER_ATTACK);
 
-        // [중요] 애니메이션이 나가는 중간 쯤(예: 0.3초 뒤)에 데미지 판정 실행
         FTimerHandle HitCheckTimer;
         GetWorldTimerManager().SetTimer(HitCheckTimer, this, &AKillerCharacter::CheckHit, 0.3f, false);
     }
-    // 2. 다른 사람 화면에 보이는 원격 살인마일 경우
     else
     {
-        // 전신(3인칭) 애니메이션만 재생
         if (BodyAttackAnimation)
         {
             PlayTemporaryBodyAnimation(BodyAttackAnimation);
         }
     }
 
-    // 공격 종료 및 상태 복구 타이머
-    const float AttackDuration = (IsPlayerControlled() && IsLocallyControlled() && AttackMontage)
-        ? AttackMontage->GetPlayLength()
+    const float AttackDuration = (IsPlayerControlled() && IsLocallyControlled() && FirstPersonAttackAnimation)
+        ? FirstPersonAttackAnimation->GetPlayLength()
         : (BodyAttackAnimation ? BodyAttackAnimation->GetPlayLength() : 0.8f);
 
     FTimerHandle AttackEndTimer;
@@ -239,11 +252,11 @@ void AKillerCharacter::StartAttack()
     );
 }
 
-// �� �Լ��� ���߿� �ִϸ��̼� ��Ƽ����(Notify)���� ȣ���� �����Դϴ�.
+// 占쏙옙 占쌉쇽옙占쏙옙 占쏙옙占쌩울옙 占쌍니몌옙占싱쇽옙 占쏙옙티占쏙옙占쏙옙(Notify)占쏙옙占쏙옙 호占쏙옙占쏙옙 占쏙옙占쏙옙占쌉니댐옙.
 void AKillerCharacter::EndAttack()
 {
     bIsAttacking = false;
-    // �ٽ� ���� �ӵ��� ����
+    // 占쌕쏙옙 占쏙옙占쏙옙 占쌈듸옙占쏙옙 占쏙옙占쏙옙
     GetCharacterMovement()->MaxWalkSpeed = 400.0f;
     UE_LOG(LogTemp, Warning, TEXT("EndAttack called"));
 }
@@ -259,26 +272,48 @@ void AKillerCharacter::CheckHit()
 
     ATutorialCharacter* Victim = nullptr;
     float BestDistance = AttackRange;
+    int32 CandidateCount = 0;
+    TArray<ATutorialCharacter*> EvaluatedCandidates;
 
-    for (TPair<int32, ATutorialCharacter*>& Pair : RemoteSurvivors)
+    auto EvaluateCandidate = [&](ATutorialCharacter* Candidate)
     {
-        ATutorialCharacter* Candidate = Pair.Value;
         if (!IsValid(Candidate) || Candidate->IsBeingCarried)
         {
-            continue;
+            return;
         }
 
-        FVector ToCandidate = Candidate->GetActorLocation() - Start;
+        if (EvaluatedCandidates.Contains(Candidate))
+        {
+            return;
+        }
+        EvaluatedCandidates.Add(Candidate);
+
+        ++CandidateCount;
+
+        UCapsuleComponent* CandidateCapsule = Candidate->GetCapsuleComponent();
+        const FVector CandidateCenter = CandidateCapsule
+            ? CandidateCapsule->GetComponentLocation()
+            : Candidate->GetActorLocation();
+        const float CandidateRadius = CandidateCapsule
+            ? CandidateCapsule->GetScaledCapsuleRadius()
+            : 0.0f;
+
+        FVector ToCandidate = CandidateCenter - Start;
         const float ForwardDistance = FVector::DotProduct(ToCandidate, ForwardVector);
         if (ForwardDistance < 0.0f || ForwardDistance > AttackRange)
         {
-            continue;
+            UE_LOG(LogTemp, Verbose, TEXT("CheckHit skipped %s: forward distance %.2f / range %.2f"),
+                *Candidate->GetName(), ForwardDistance, AttackRange);
+            return;
         }
 
         const float SideDistance = (ToCandidate - ForwardVector * ForwardDistance).Size();
-        if (SideDistance > 100.0f)
+        const float AllowedSideDistance = 100.0f + CandidateRadius;
+        if (SideDistance > AllowedSideDistance)
         {
-            continue;
+            UE_LOG(LogTemp, Verbose, TEXT("CheckHit skipped %s: side distance %.2f / allowed %.2f"),
+                *Candidate->GetName(), SideDistance, AllowedSideDistance);
+            return;
         }
 
         if (ForwardDistance < BestDistance)
@@ -286,6 +321,18 @@ void AKillerCharacter::CheckHit()
             BestDistance = ForwardDistance;
             Victim = Candidate;
         }
+    };
+
+    for (TPair<int32, ATutorialCharacter*>& Pair : RemoteSurvivors)
+    {
+        EvaluateCandidate(Pair.Value);
+    }
+
+    TArray<AActor*> FoundSurvivors;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATutorialCharacter::StaticClass(), FoundSurvivors);
+    for (AActor* Actor : FoundSurvivors)
+    {
+        EvaluateCandidate(Cast<ATutorialCharacter>(Actor));
     }
 
     DrawDebugLine(GetWorld(), Start, End, Victim ? FColor::Green : FColor::Red, false, 1.0f, 0, 2.0f);
@@ -293,18 +340,27 @@ void AKillerCharacter::CheckHit()
     if (Victim)
     {
         bHasDealtDamage = true;
-        Victim->PlayNetworkHitReaction();
-        const int32 HitTargetId = Victim->IsDowned ? -Victim->MyPlayerId : Victim->MyPlayerId;
-        SendActionToServer(ACTION_SURVIVOR_HIT, HitTargetId);
+        const bool bHasNetworkId = Victim->MyPlayerId != -1;
+        if (bHasNetworkId)
+        {
+            Victim->PlayNetworkHitReaction();
+            const int32 HitTargetId = Victim->IsDowned ? -Victim->MyPlayerId : Victim->MyPlayerId;
+            SendActionToServer(ACTION_SURVIVOR_HIT, HitTargetId);
+        }
+        else
+        {
+            Victim->PlayHitReaction();
+        }
 
         UE_LOG(LogTemp, Warning, TEXT("Hit Target: %s / ID: %d"), *Victim->GetName(), Victim->MyPlayerId);
         DrawDebugSphere(GetWorld(), Victim->GetActorLocation(), 20.0f, 12, FColor::Yellow, false, 1.0f);
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("CheckHit called | bHasDealtDamage = %s"), bHasDealtDamage ? TEXT("true") : TEXT("false"));
+    UE_LOG(LogTemp, Warning, TEXT("CheckHit called | candidates = %d | bHasDealtDamage = %s"),
+        CandidateCount, bHasDealtDamage ? TEXT("true") : TEXT("false"));
 }
 
-// ������ ���� �Լ�
+// 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 占쌉쇽옙
 void AKillerCharacter::PickupSurvivor()
 {
     if (CarriedSurvivor) return;
@@ -351,13 +407,28 @@ void AKillerCharacter::PickupSurvivor()
         CarriedSurvivor->GetCharacterMovement()->DisableMovement();
         CarriedSurvivor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("CarrySocket"));
 
-        UE_LOG(LogTemp, Warning, TEXT("�����ڸ� ������ϴ�!"));
+        UE_LOG(LogTemp, Warning, TEXT("Survivor picked up."));
 
         PlayCarryAnimation();
         if (PickupMontage) PlayAnimMontage(PickupMontage);
         SendActionToServer(ACTION_SURVIVOR_PICKUP, CarriedSurvivor->MyPlayerId);
     }
 }
+
+void AKillerCharacter::DropSurvivor()
+{
+    if (!CarriedSurvivor)
+    {
+        return;
+    }
+
+    CarriedSurvivor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+    CarriedSurvivor->IsBeingCarried = false;
+    CarriedSurvivor->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    CarriedSurvivor->GetCharacterMovement()->SetDefaultMovementMode();
+    CarriedSurvivor = nullptr;
+}
+
 void AKillerCharacter::SendLocationToServer()
 {
     if (MyPlayerId == -1) return;
@@ -367,14 +438,14 @@ void AKillerCharacter::SendLocationToServer()
         FPacketMove MovePkt;
         MovePkt.Type = PKT_MOVE;
         MovePkt.Data.PlayerId = MyPlayerId;
-        MovePkt.Data.CharacterType = CHARACTER_KILLER; // 살인마 타입
+        MovePkt.Data.CharacterType = CHARACTER_KILLER; // ?댁씤留????
 
         MovePkt.Data.X = GetActorLocation().X;
         MovePkt.Data.Y = GetActorLocation().Y;
         MovePkt.Data.Z = GetActorLocation().Z;
         MovePkt.Data.RotationYaw = GetActorRotation().Yaw;
 
-        // [중요] 속도 계산 대신 입력값을 직접 넣습니다.
+        // [以묒슂] ?띾룄 怨꾩궛 ????낅젰媛믪쓣 吏곸젒 ?ｌ뒿?덈떎.
         MovePkt.Data.ForwardValue = MoveForwardValue;
         MovePkt.Data.RightValue = MoveRightValue;
         MovePkt.Data.bIsSprinting = false;
@@ -465,12 +536,12 @@ void AKillerCharacter::SendActionToServer(uint8 ActionType, int32 TargetId)
     if (!NetworkWorker || !NetworkWorker->GetSocket()) return;
 
     FPacketAction ActionPkt;
-    ActionPkt.Type = PKT_ACTION; // Shared.h에 정의된 타입
+    ActionPkt.Type = PKT_ACTION; // Shared.h???뺤쓽?????
     ActionPkt.ActionType = ActionType;
     ActionPkt.InstigatorId = MyPlayerId;
     ActionPkt.TargetId = TargetId;
 
-    // 현재 위치와 회전값도 같이 실어 보냅니다 (다른 클라에서 정확한 위치에 보이도록)
+    // ?꾩옱 ?꾩튂? ?뚯쟾媛믩룄 媛숈씠 ?ㅼ뼱 蹂대깄?덈떎 (?ㅻⅨ ?대씪?먯꽌 ?뺥솗???꾩튂??蹂댁씠?꾨줉)
     FVector Loc = GetActorLocation();
     ActionPkt.X = Loc.X;
     ActionPkt.Y = Loc.Y;
@@ -483,8 +554,71 @@ void AKillerCharacter::SendActionToServer(uint8 ActionType, int32 TargetId)
 }
 
 
+
+AGenerator* AKillerCharacter::FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const
+{
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+
+    TArray<AActor*> FoundGenerators;
+    UGameplayStatics::GetAllActorsOfClass(World, AGenerator::StaticClass(), FoundGenerators);
+
+    AGenerator* NearestGenerator = nullptr;
+    float BestDistanceSq = TNumericLimits<float>::Max();
+
+    for (AActor* Actor : FoundGenerators)
+    {
+        AGenerator* Generator = Cast<AGenerator>(Actor);
+        if (!Generator) continue;
+
+        if (Generator->GetGeneratorId() == GeneratorId)
+        {
+            return Generator;
+        }
+
+        const float DistanceSq = FVector::DistSquared(Generator->GetActorLocation(), Location);
+        if (DistanceSq < BestDistanceSq)
+        {
+            BestDistanceSq = DistanceSq;
+            NearestGenerator = Generator;
+        }
+    }
+
+    return NearestGenerator;
+}
+
+void AKillerCharacter::ApplyGeneratorNetworkAction(uint8 ActionType, int32 GeneratorId, const FVector& Location, float RepairProgress)
+{
+    AGenerator* Generator = FindGeneratorForNetworkAction(GeneratorId, Location);
+    if (!Generator) return;
+
+    if (ActionType == ACTION_GENERATOR_START)
+    {
+        Generator->ApplyNetworkRepairState(true, false, RepairProgress);
+    }
+    else if (ActionType == ACTION_GENERATOR_CANCEL)
+    {
+        Generator->ApplyNetworkRepairState(false, false, RepairProgress);
+    }
+    else if (ActionType == ACTION_GENERATOR_COMPLETE)
+    {
+        Generator->ApplyNetworkRepairState(false, true, 1.f);
+    }
+}
 void AKillerCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw)
 {
+    if (ActionType == ACTION_GENERATOR_START || ActionType == ACTION_GENERATOR_CANCEL || ActionType == ACTION_GENERATOR_COMPLETE)
+    {
+        if (RemoteSurvivors.Contains(InstigatorId) && IsValid(RemoteSurvivors[InstigatorId]))
+        {
+            RemoteSurvivors[InstigatorId]->SetRepairingGenerator(ActionType == ACTION_GENERATOR_START);
+            RemoteSurvivors[InstigatorId]->IsInteracting = (ActionType == ACTION_GENERATOR_START);
+        }
+
+        ApplyGeneratorNetworkAction(ActionType, TargetId, Location, RotationYaw);
+        return;
+    }
+
     if (ActionType == ACTION_KILLER_ATTACK)
     {
         if (RemoteKillers.Contains(InstigatorId) && IsValid(RemoteKillers[InstigatorId]))
@@ -493,7 +627,7 @@ void AKillerCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId,
             RemoteKiller->SetActorLocation(Location);
             RemoteKiller->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
 
-            // StartAttack() 대신 전신 애니메이션만 바로 강제 재생시킴 (무한 루프 방지)
+            // StartAttack() ????꾩떊 ?좊땲硫붿씠?섎쭔 諛붾줈 媛뺤젣 ?ъ깮?쒗궡 (臾댄븳 猷⑦봽 諛⑹?)
             if (RemoteKiller->BodyAttackAnimation)
             {
                 RemoteKiller->PlayTemporaryBodyAnimation(RemoteKiller->BodyAttackAnimation);
@@ -593,4 +727,5 @@ void AKillerCharacter::RestoreBodyAnimClass()
         }
     }
 }
+
 

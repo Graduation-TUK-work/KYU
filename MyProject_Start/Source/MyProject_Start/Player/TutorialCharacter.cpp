@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "MyProject_Start/Player/TutorialCharacter.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -11,19 +11,20 @@
 #include "UObject/ConstructorHelpers.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "MyProject_Start/InteractionInterface.h"
-#include "MyProject_Start/NetworkWorker.h" // �߰�
+#include "MyProject_Start/NetworkWorker.h" // 占쌩곤옙
 #include "MyProject_Start/KillerCharacter.h"
 #include "MyProject_Start/Generator.h"
-#include "Networking.h"    // �߰�
-#include "Sockets.h"       // �߰�
+#include "Networking.h"    // 占쌩곤옙
+#include "Sockets.h"       // 占쌩곤옙
 
 ATutorialCharacter::ATutorialCharacter()
 {
     bCanVault = false;
     PrimaryActorTick.bCanEverTick = true;
 
-    // ī�޶� �� �������� ����
+    // 카占쌨띰옙 占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙
     SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SPRINGARM"));
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("CAMERA"));
 
@@ -37,7 +38,7 @@ ATutorialCharacter::ATutorialCharacter()
     );
     SpringArm->bUsePawnControlRotation = true;
 
-    // �޽� ��ġ �� ȸ�� ����
+    // 占쌨쏙옙 占쏙옙치 占쏙옙 회占쏙옙 占쏙옙占쏙옙
     GetMesh()->SetRelativeLocationAndRotation(
         FVector(0.f, 0.f, -88.f),
         FRotator(0.f, -90.f, 0.f)
@@ -52,20 +53,20 @@ ATutorialCharacter::ATutorialCharacter()
     }
 
 
-    static ConstructorHelpers::FObjectFinder<UAnimMontage> HitMontageAsset(
-        TEXT("/Script/Engine.AnimMontage'/Game/Animation/player/AM_Big_Kidney_Hit.AM_Big_Kidney_Hit'")
+    static ConstructorHelpers::FObjectFinder<UAnimMontage> NewHitMontageAsset(
+        TEXT("/Script/Engine.AnimMontage'/Game/Animation/player/AM_Hit_On_The_Back_Montag.AM_Hit_On_The_Back_Montag'")
     );
-    if (HitMontageAsset.Succeeded())
+    if (NewHitMontageAsset.Succeeded())
     {
-        HitMontage = HitMontageAsset.Object;
+        HitMontage = NewHitMontageAsset.Object;
     }
 
-    static ConstructorHelpers::FObjectFinder<UAnimMontage> DownedMontageAsset(
-        TEXT("/Script/Engine.AnimMontage'/Game/Animation/player/AM_Fallen_Idle.AM_Fallen_Idle'")
+    static ConstructorHelpers::FObjectFinder<UAnimMontage> NewDownedMontageAsset(
+        TEXT("/Script/Engine.AnimMontage'/Game/Animation/player/AM_Player_Dying_Anim.AM_Player_Dying_Anim'")
     );
-    if (DownedMontageAsset.Succeeded())
+    if (NewDownedMontageAsset.Succeeded())
     {
-        DownedMontage = DownedMontageAsset.Object;
+        DownedMontage = NewDownedMontageAsset.Object;
     }
 
     static ConstructorHelpers::FObjectFinder<UAnimSequence> HitReactionAnimationAsset(
@@ -85,7 +86,14 @@ ATutorialCharacter::ATutorialCharacter()
     }
 
     
-    // �̵� ����
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> RepairAnimationAsset(
+        TEXT("/Script/Engine.AnimSequence'/Game/Animation/player/Cow_Milking.Cow_Milking'")
+    );
+    if (RepairAnimationAsset.Succeeded())
+    {
+        RepairAnimation = RepairAnimationAsset.Object;
+    }
+    // 占싱듸옙 占쏙옙占쏙옙
     bUseControllerRotationYaw = false;
 
     GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -130,11 +138,11 @@ void ATutorialCharacter::BeginPlay()
 
 void ATutorialCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    // ���� ���� �� �����带 �����ϰ� ����
+    // 占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙 占쏙옙占쏙옙占썲를 占쏙옙占쏙옙占싹곤옙 占쏙옙占쏙옙
     if (NetworkWorker)
     {
         NetworkWorker->Stop();
-        // �޸� ������ �Ҹ��ڿ��� ó����
+        // 占쌨몌옙 占쏙옙占쏙옙占쏙옙 占쌀몌옙占쌘울옙占쏙옙 처占쏙옙占쏙옙
     }
 
     Super::EndPlay(EndPlayReason);
@@ -145,9 +153,12 @@ void ATutorialCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ATutorialCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-    TraceForInteractable();
 
-    // �� ĳ������ ��쿡�� ������ ��ġ ����
+    if (!IsInteracting)
+    {
+        TraceForInteractable();
+    }
+
     if (IsPlayerControlled() && IsLocallyControlled())
     {
         SendLocationToServer();
@@ -160,19 +171,25 @@ void ATutorialCharacter::Tick(float DeltaTime)
 
     if (IsInteracting && CurrentInteractable)
     {
-        // [추가된 로직] 대상이 발전기인데 이미 수리가 끝났다면?
-        if (AGenerator* Generator = Cast<AGenerator>(CurrentInteractable))
+        AGenerator* Generator = Cast<AGenerator>(CurrentInteractable);
+        if (Generator && Generator->bIsRepaired)
         {
-            if (Generator->bIsRepaired)
-            {
-                // 강제로 상호작용 중단
-                CancelInteraction();
-                return;
-            }
+            CancelInteraction();
+            return;
         }
 
-        // 수리가 안 끝났을 때만 업데이트 실행
+        const bool bWasGeneratorRepaired = Generator && Generator->bIsRepaired;
+
+        // ?섎━媛 ???앸궗???뚮쭔 ?낅뜲?댄듃 ?ㅽ뻾
         IInteractionInterface::Execute_UpdateInteract(CurrentInteractable, DeltaTime);
+
+        if (Generator && !bWasGeneratorRepaired && Generator->bIsRepaired)
+        {
+            SendGeneratorActionToServer(ACTION_GENERATOR_COMPLETE, Generator);
+            SetRepairingGenerator(false);
+            ShowGeneratorRepairCount();
+            IsInteracting = false;
+        }
     }
 
     if (bIsVaultMoving)
@@ -206,22 +223,22 @@ void ATutorialCharacter::SendLocationToServer()
         MovePkt.Data.PlayerId = MyPlayerId;
         MovePkt.Data.CharacterType = CHARACTER_SURVIVOR;
 
-        // 1. 위치 및 회전 세팅
+        // 1. ?꾩튂 諛??뚯쟾 ?명똿
         FVector CurLocation = GetActorLocation();
         MovePkt.Data.X = CurLocation.X;
         MovePkt.Data.Y = CurLocation.Y;
         MovePkt.Data.Z = CurLocation.Z;
         MovePkt.Data.RotationYaw = GetActorRotation().Yaw;
 
-        // 2. [수정된 부분] 복잡한 속도 계산을 지우고, 입력값을 그대로 넣습니다!
+        // 2. [?섏젙??遺遺? 蹂듭옟???띾룄 怨꾩궛??吏?곌퀬, ?낅젰媛믪쓣 洹몃?濡??ｌ뒿?덈떎!
         MovePkt.Data.ForwardValue = MoveForwardValue;
         MovePkt.Data.RightValue = MoveRightValue;
 
-        // 3. 달리기 상태 세팅 (기존 코드 유지)
+        // 3. ?щ━湲??곹깭 ?명똿 (湲곗〈 肄붾뱶 ?좎?)
         MovePkt.Data.bIsSprinting = (GetCharacterMovement()->MaxWalkSpeed > 350.0f);
 
 
-        // 4. 서버로 전송
+        // 4. ?쒕쾭濡??꾩넚
         int32 BytesSent = 0;
         NetworkWorker->GetSocket()->Send((uint8*)&MovePkt, sizeof(FPacketMove), BytesSent);
     }
@@ -271,13 +288,13 @@ void ATutorialCharacter::MoveRight(float Value)
 
 void ATutorialCharacter::BeginSprint()
 {
-    // ���� 1000���� 150 ������ 850 ����
+    // 占쏙옙占쏙옙 1000占쏙옙占쏙옙 150 占쏙옙占쏙옙占쏙옙 850 占쏙옙占쏙옙
     GetCharacterMovement()->MaxWalkSpeed = 350.0f;
 }
 
 void ATutorialCharacter::EndSprint()
 {
-    // ���� 600���� 150 ������ 450 ����
+    // 占쏙옙占쏙옙 600占쏙옙占쏙옙 150 占쏙옙占쏙옙占쏙옙 450 占쏙옙占쏙옙
     GetCharacterMovement()->MaxWalkSpeed = 350.0f;
 }
 
@@ -330,38 +347,114 @@ void ATutorialCharacter::TryVault()
 
 void ATutorialCharacter::TraceForInteractable()
 {
-    if (!Camera) return; // ī�޶� ������ ���� �� ��
+    if (!Camera) return;
 
     FHitResult Hit;
-    // 1. ī�޶��� ���� ���� ��ġ�� ���� ������ �����ɴϴ�.
     FVector StartLocation = Camera->GetComponentLocation();
     FVector ForwardVector = Camera->GetForwardVector();
 
-    // 2. ������(Start)�� ĳ���� �� ������ 1���� ���� �о���ϴ�. (�ڱ� �ڽ� �浹 ����)
-    FVector TraceStart = StartLocation + (ForwardVector * 100.f);
-
-    // 3. ����(End)�� ���������� 300 unit(3����) �� ������ �����մϴ�.
-    FVector TraceEnd = TraceStart + (ForwardVector * 300.f);
+    // ?ㅼ젣 議곗???理쒖쟻?붾맂 ?ш굅由ъ? ?쒖옉 吏??
+    FVector TraceStart = StartLocation;
+    FVector TraceEnd = TraceStart + (ForwardVector * 1500.f);
 
     FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this); // ����(ĳ���� ��ü) ����
+    Params.AddIgnoredActor(this);
 
-    // 4. LineTrace ����
-    bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params);
+    // ?먯젙 踰붿쐞瑜??됰꼮?섍쾶 ?섏뿬 ?꾩썙?덈뒗 ??곷룄 ???≫엳?꾨줉 ?좎? (諛섏?由?40cm)
+    FCollisionShape SphereShape = FCollisionShape::MakeSphere(40.f);
+
+    TArray<FHitResult> Hits;
+    GetWorld()->SweepMultiByChannel(
+        Hits, TraceStart, TraceEnd, FQuat::Identity, ECC_Visibility, SphereShape, Params
+    );
 
     AActor* NewInteractable = nullptr;
-    if (bHit && Hit.GetActor() && Hit.GetActor()->Implements<UInteractionInterface>())
+
+    for (const FHitResult& CandidateHit : Hits)
     {
-        NewInteractable = Hit.GetActor();
+        AActor* HitActor = CandidateHit.GetActor();
+        if (!HitActor || HitActor == this)
+        {
+            continue;
+        }
+
+        if (!Cast<IInteractionInterface>(HitActor))
+        {
+            continue;
+        }
+
+        if (ATutorialCharacter* TargetChar = Cast<ATutorialCharacter>(HitActor))
+        {
+            if (TargetChar->IsDowned)
+            {
+                NewInteractable = HitActor;
+                break;
+            }
+        }
+        else
+        {
+            NewInteractable = HitActor;
+            break;
+        }
     }
 
-    // ����� �ٲ�ų� �þ߿��� ����� Cancel ó��
+    if (!NewInteractable)
+    {
+        TArray<AActor*> FoundGenerators;
+        UGameplayStatics::GetAllActorsOfClass(GetWorld(), AGenerator::StaticClass(), FoundGenerators);
+
+        const FVector SearchOrigin = Camera->GetComponentLocation();
+        const FVector SearchForward = Camera->GetForwardVector().GetSafeNormal();
+        constexpr float MaxGeneratorInteractDistance = 650.f;
+        constexpr float MinGeneratorFacingDot = 0.25f;
+
+        AGenerator* BestGenerator = nullptr;
+        float BestScore = TNumericLimits<float>::Max();
+
+        for (AActor* Actor : FoundGenerators)
+        {
+            AGenerator* Generator = Cast<AGenerator>(Actor);
+            if (!IsValid(Generator) || Generator->bIsRepaired)
+            {
+                continue;
+            }
+
+            const FVector ToGenerator = Generator->GetActorLocation() - SearchOrigin;
+            const float Distance = ToGenerator.Size();
+            if (Distance > MaxGeneratorInteractDistance)
+            {
+                continue;
+            }
+
+            const float FacingDot = FVector::DotProduct(SearchForward, ToGenerator.GetSafeNormal());
+            if (FacingDot < MinGeneratorFacingDot)
+            {
+                continue;
+            }
+
+            const float Score = Distance - (FacingDot * 200.f);
+            if (Score < BestScore)
+            {
+                BestScore = Score;
+                BestGenerator = Generator;
+            }
+        }
+
+        NewInteractable = BestGenerator;
+    }
+    // ?곹샇?묒슜 ??곸씠 諛붾뚯뿀???뚯쓽 泥섎━
     if (CurrentInteractable != NewInteractable)
     {
         if (IsInteracting && CurrentInteractable)
         {
+            AGenerator* Generator = Cast<AGenerator>(CurrentInteractable);
             IInteractionInterface::Execute_CancelInteract(CurrentInteractable);
             IsInteracting = false;
+
+            if (Generator)
+            {
+                SendGeneratorActionToServer(ACTION_GENERATOR_CANCEL, Generator);
+            }
         }
         CurrentInteractable = NewInteractable;
     }
@@ -369,20 +462,34 @@ void ATutorialCharacter::TraceForInteractable()
 
 void ATutorialCharacter::StartInteraction()
 {
+    TraceForInteractable();
+
+    if (!CurrentInteractable)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("No interactable found."));
+        return;
+    }
+
     if (CurrentInteractable)
     {
-        // [추가된 로직] 이미 수리된 발전기인지 확인
+        // [異붽???濡쒖쭅] ?대? ?섎━??諛쒖쟾湲곗씤吏 ?뺤씤
         if (AGenerator* Generator = Cast<AGenerator>(CurrentInteractable))
         {
             if (Generator->bIsRepaired)
             {
                 UE_LOG(LogTemp, Warning, TEXT("This generator is already done!"));
-                return; // 함수 종료
+                return; // ?⑥닔 醫낅즺
             }
         }
 
         IInteractionInterface::Execute_StartInteract(CurrentInteractable, this);
         IsInteracting = true;
+
+        if (AGenerator* Generator = Cast<AGenerator>(CurrentInteractable))
+        {
+            SetRepairingGenerator(true);
+            SendGeneratorActionToServer(ACTION_GENERATOR_START, Generator);
+        }
     }
 }
 
@@ -390,11 +497,146 @@ void ATutorialCharacter::CancelInteraction()
 {
     if (IsInteracting && CurrentInteractable)
     {
+        AGenerator* Generator = Cast<AGenerator>(CurrentInteractable);
         IInteractionInterface::Execute_CancelInteract(CurrentInteractable);
         IsInteracting = false;
+        SetRepairingGenerator(false);
+
+        if (Generator)
+        {
+            SendGeneratorActionToServer(ACTION_GENERATOR_CANCEL, Generator);
+        }
     }
 }
 
+
+void ATutorialCharacter::SetRepairingGenerator(bool bRepairing)
+{
+    if (bIsRepairingGenerator == bRepairing)
+    {
+        return;
+    }
+
+    bIsRepairingGenerator = bRepairing;
+
+    if (bIsRepairingGenerator)
+    {
+        if (RepairAnimation)
+        {
+            PlayLoopBodyAnimation(RepairAnimation);
+        }
+    }
+    else
+    {
+        RestoreBodyAnimClass();
+    }
+}
+void ATutorialCharacter::SendGeneratorActionToServer(uint8 ActionType, AGenerator* Generator)
+{
+    if (!Generator || !NetworkWorker || !NetworkWorker->GetSocket() || MyPlayerId == -1) return;
+
+    FPacketAction ActionPkt;
+    ActionPkt.Type = PKT_ACTION;
+    ActionPkt.ActionType = ActionType;
+    ActionPkt.InstigatorId = MyPlayerId;
+    ActionPkt.TargetId = Generator->GetGeneratorId();
+
+    const FVector Loc = Generator->GetActorLocation();
+    ActionPkt.X = Loc.X;
+    ActionPkt.Y = Loc.Y;
+    ActionPkt.Z = Loc.Z;
+    ActionPkt.RotationYaw = Generator->GetRepairProgress();
+
+    int32 BytesSent = 0;
+    NetworkWorker->GetSocket()->Send((uint8*)&ActionPkt, sizeof(FPacketAction), BytesSent);
+}
+
+void ATutorialCharacter::ShowGeneratorRepairCount() const
+{
+    UWorld* World = GetWorld();
+    if (!World) return;
+
+    TArray<AActor*> FoundGenerators;
+    UGameplayStatics::GetAllActorsOfClass(World, AGenerator::StaticClass(), FoundGenerators);
+
+    int32 TotalGenerators = 0;
+    int32 RepairedGenerators = 0;
+
+    for (AActor* Actor : FoundGenerators)
+    {
+        AGenerator* Generator = Cast<AGenerator>(Actor);
+        if (!Generator) continue;
+
+        ++TotalGenerators;
+        if (Generator->bIsRepaired)
+        {
+            ++RepairedGenerators;
+        }
+    }
+
+    const FString Message = FString::Printf(TEXT("Generator Repaired: %d/%d"), TotalGenerators, RepairedGenerators);
+    UE_LOG(LogTemp, Warning, TEXT("%s"), *Message);
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(3001, 4.0f, FColor::Yellow, Message);
+    }
+}
+AGenerator* ATutorialCharacter::FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const
+{
+    UWorld* World = GetWorld();
+    if (!World) return nullptr;
+
+    TArray<AActor*> FoundGenerators;
+    UGameplayStatics::GetAllActorsOfClass(World, AGenerator::StaticClass(), FoundGenerators);
+
+    AGenerator* NearestGenerator = nullptr;
+    float BestDistanceSq = TNumericLimits<float>::Max();
+
+    for (AActor* Actor : FoundGenerators)
+    {
+        AGenerator* Generator = Cast<AGenerator>(Actor);
+        if (!Generator) continue;
+
+        if (Generator->GetGeneratorId() == GeneratorId)
+        {
+            return Generator;
+        }
+
+        const float DistanceSq = FVector::DistSquared(Generator->GetActorLocation(), Location);
+        if (DistanceSq < BestDistanceSq)
+        {
+            BestDistanceSq = DistanceSq;
+            NearestGenerator = Generator;
+        }
+    }
+
+    return NearestGenerator;
+}
+
+void ATutorialCharacter::ApplyGeneratorNetworkAction(uint8 ActionType, int32 GeneratorId, const FVector& Location, float RepairProgress)
+{
+    AGenerator* Generator = FindGeneratorForNetworkAction(GeneratorId, Location);
+    if (!Generator) return;
+
+    if (ActionType == ACTION_GENERATOR_START)
+    {
+        Generator->ApplyNetworkRepairState(true, false, RepairProgress);
+    }
+    else if (ActionType == ACTION_GENERATOR_CANCEL)
+    {
+        Generator->ApplyNetworkRepairState(false, false, RepairProgress);
+    }
+    else if (ActionType == ACTION_GENERATOR_COMPLETE)
+    {
+        const bool bWasRepaired = Generator->bIsRepaired;
+        Generator->ApplyNetworkRepairState(false, true, 1.f);
+        if (!bWasRepaired)
+        {
+            ShowGeneratorRepairCount();
+        }
+    }
+}
 void ATutorialCharacter::PlayHitReaction()
 {
     ApplyHitReaction(true);
@@ -411,20 +653,20 @@ void ATutorialCharacter::ForceDownedState()
     IsDowned = true;
     bCanBeHit = false;
 
-    if (DownedAnimation)
-    {
-        PlayLoopBodyAnimation(DownedAnimation);
-    }
-    else if (DownedMontage)
+    if (DownedMontage)
     {
         PlayAnimMontage(DownedMontage);
+    }
+    else if (DownedAnimation)
+    {
+        PlayLoopBodyAnimation(DownedAnimation);
     }
 
     GetCapsuleComponent()->SetCapsuleHalfHeight(30.0f);
     GetCharacterMovement()->DisableMovement();
     bUseControllerRotationYaw = false;
 
-    UE_LOG(LogTemp, Error, TEXT("������ ��� ����(Downed)!"));
+    UE_LOG(LogTemp, Error, TEXT("Survivor entered the downed state."));
 }
 void ATutorialCharacter::ApplyHitReaction(bool bRespectCooldown)
 {
@@ -433,24 +675,24 @@ void ATutorialCharacter::ApplyHitReaction(bool bRespectCooldown)
 
     bCanBeHit = false;
     CurrentHealth--;
-    UE_LOG(LogTemp, Warning, TEXT("������ �ǰݵ�! ���� ü��: %d"), CurrentHealth);
+    UE_LOG(LogTemp, Warning, TEXT("Survivor took damage. Current health: %d"), CurrentHealth);
 
     if (CurrentHealth > 0)
     {
-        if (HitReactionAnimation)
-        {
-            PlayTemporaryBodyAnimation(HitReactionAnimation);
-        }
-        else if (HitMontage)
+        if (HitMontage)
         {
             PlayAnimMontage(HitMontage);
+        }
+        else if (HitReactionAnimation)
+        {
+            PlayTemporaryBodyAnimation(HitReactionAnimation);
         }
 
         FTimerHandle HitCooldownTimer;
         GetWorldTimerManager().SetTimer(HitCooldownTimer, FTimerDelegate::CreateLambda([this]()
             {
                 bCanBeHit = true;
-                UE_LOG(LogTemp, Log, TEXT("������ ���� �ٽ� ���� �� ����"));
+                UE_LOG(LogTemp, Log, TEXT("占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 占쌕쏙옙 占쏙옙占쏙옙 占쏙옙 占쏙옙占쏙옙"));
             }), 1.0f, false);
     }
     else
@@ -466,13 +708,13 @@ void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, fl
     if (!World || World->bIsTearingDown) return;
     if (!IsValid(this)) return;
 
-    // 1. �ʿ� �ش� ID�� �ִ��� Ȯ��
+    // 1. 占십울옙 占쌔댐옙 ID占쏙옙 占쌍댐옙占쏙옙 확占쏙옙
     if (RemotePlayers.Contains(PlayerId))
     {
-        // �����ϰ� ĳ���ͷ� ����ȯ
+        // 占쏙옙占쏙옙占싹곤옙 캐占쏙옙占싶뤄옙 占쏙옙占쏙옙환
         ATutorialCharacter* Target = Cast<ATutorialCharacter>(RemotePlayers[PlayerId]);
 
-        // [����] Target�� �޸𸮿� ����ֱ⸸ �ϸ� ������Ʈ ����
+        // [占쏙옙占쏙옙] Target占쏙옙 占쌨모리울옙 占쏙옙占쏙옙殮綬?占싹몌옙 占쏙옙占쏙옙占쏙옙트 占쏙옙占쏙옙
         if (IsValid(Target))
         {
             Target->SetActorLocation(Location);
@@ -482,17 +724,17 @@ void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, fl
             Target->RemoteRightValue = Right;
             Target->RemoteIsSprinting = bSprint;
 
-            // ���⼭ �Լ� ���� (���������� ������Ʈ��)
+            // 占쏙옙占썩서 占쌉쇽옙 占쏙옙占쏙옙 (占쏙옙占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙트占쏙옙)
             return;
         }
         else
         {
-            // ������ �÷��� ������ ������ٸ� �ʿ��� ����
+            // 占쏙옙占쏙옙占쏙옙 占시뤄옙占쏙옙 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙摸占?占십울옙占쏙옙 占쏙옙占쏙옙
             RemotePlayers.Remove(PlayerId);
         }
     }
 
-    // 2. �ʿ� ���ų� Target�� ��ȿ���� ���� ��쿡�� ���� (���Ⱑ else ���� ���� ��)
+    // 2. 占십울옙 占쏙옙占신놂옙 Target占쏙옙 占쏙옙효占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙荑∽옙占?占쏙옙占쏙옙 (占쏙옙占썩가 else 占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙)
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
@@ -501,9 +743,15 @@ void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, fl
     if (NewPlayer)
     {
         NewPlayer->MyPlayerId = PlayerId;
-        // �ʿ� Ȯ���� ���
         NewPlayer->AutoPossessPlayer = EAutoReceiveInput::Disabled;
-        NewPlayer->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+        // [?섏젙] NoCollision(異⑸룎 ?놁쓬)??QueryOnly(?덉씠? 媛먯?留?媛??濡?諛붽퓠?덈떎.
+        // ?대젃寃??댁빞 ?덉씠?(Trace)媛 罹먮┃?곗쓽 紐몄뿉 留욎뒿?덈떎.
+        NewPlayer->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+        // [異붽?] ?뱀떆 紐⑤Ⅴ???덉씠? 梨꾨꼸(Visibility)???뺤떎??'Block'?섎룄濡??ㅼ젙?⑸땲??
+        NewPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+
         NewPlayer->DisableInput(nullptr);
         RemotePlayers.Add(PlayerId, NewPlayer);
         UE_LOG(LogTemp, Warning, TEXT("New Remote Player Spawned! ID: %d"), PlayerId);
@@ -524,7 +772,7 @@ void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, fl
             Target->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
 
             // =========================================================
-            // [핵심 추가] 서버에서 받은 애니메이션 입력값을 킬러에게 주입!
+            // [?듭떖 異붽?] ?쒕쾭?먯꽌 諛쏆? ?좊땲硫붿씠???낅젰媛믪쓣 ?щ윭?먭쾶 二쇱엯!
             // =========================================================
             Target->RemoteForwardValue = Forward;
             Target->RemoteRightValue = Right;
@@ -545,7 +793,7 @@ void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, fl
         NewKiller->MyPlayerId = PlayerId;
 
         // =========================================================
-        // [핵심 추가] 처음 스폰될 때도 초기 이동 값을 넣어줍니다.
+        // [?듭떖 異붽?] 泥섏쓬 ?ㅽ룿???뚮룄 珥덇린 ?대룞 媛믪쓣 ?ｌ뼱以띾땲??
         // =========================================================
         NewKiller->RemoteForwardValue = Forward;
         NewKiller->RemoteRightValue = Right;
@@ -561,6 +809,18 @@ void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, fl
 
 void ATutorialCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw)
 {
+    if (ActionType == ACTION_GENERATOR_START || ActionType == ACTION_GENERATOR_CANCEL || ActionType == ACTION_GENERATOR_COMPLETE)
+    {
+        if (RemotePlayers.Contains(InstigatorId) && IsValid(RemotePlayers[InstigatorId]))
+        {
+            RemotePlayers[InstigatorId]->SetRepairingGenerator(ActionType == ACTION_GENERATOR_START);
+            RemotePlayers[InstigatorId]->IsInteracting = (ActionType == ACTION_GENERATOR_START);
+        }
+
+        ApplyGeneratorNetworkAction(ActionType, TargetId, Location, RotationYaw);
+        return;
+    }
+
     if (ActionType == ACTION_KILLER_ATTACK)
     {
         if (RemoteKillers.Contains(InstigatorId) && IsValid(RemoteKillers[InstigatorId]))
@@ -670,4 +930,55 @@ void ATutorialCharacter::RestoreBodyAnimClass()
             GetMesh()->SetAnimInstanceClass(SurvivorAnimClass);
         }
     }
+}
+
+// 1. ?곹샇?묒슜 ?쒖옉
+void ATutorialCharacter::StartInteract_Implementation(ACharacter* Interactor)
+{
+    // ?닿? ?꾩썙?덉쓣 ?뚮쭔 ??몄씠 ?섎? ?대┫ ???덉쓬
+    if (!IsDowned) return;
+
+    UE_LOG(LogTemp, Warning, TEXT("Someone is healing me!"));
+}
+
+// 2. ?곹샇?묒슜 ?낅뜲?댄듃 (吏꾪뻾)
+void ATutorialCharacter::UpdateInteract_Implementation(float DeltaTime)
+{
+    if (!IsDowned) return;
+
+    RecoveryProgress += DeltaTime / MaxRecoveryTime;
+    RecoveryProgress = FMath::Clamp(RecoveryProgress, 0.f, 1.f);
+
+    // GEngine->AddOnScreenDebugMessage(...) ??젣
+
+    if (RecoveryProgress >= 1.0f)
+    {
+        IInteractionInterface::Execute_CompleteInteract(this);
+    }
+}
+
+// 3. ?곹샇?묒슜 痍⑥냼
+void ATutorialCharacter::CancelInteract_Implementation()
+{
+    // 移섎즺諛쏅떎媛 以묐떒??
+    UE_LOG(LogTemp, Warning, TEXT("Healing interrupted."));
+}
+
+// 4. ?곹샇?묒슜 ?꾨즺 (遺??
+void ATutorialCharacter::CompleteInteract_Implementation()
+{
+    if (!IsDowned) return;
+
+    IsDowned = false;
+    CurrentHealth = 1; // 遺???곹깭濡?蹂듦뎄
+    RecoveryProgress = 0.0f;
+
+    // 罹≪뒓 ?믪씠? ?대룞 ?λ젰 蹂듦뎄
+    GetCapsuleComponent()->SetCapsuleHalfHeight(88.0f);
+    GetCharacterMovement()->SetDefaultMovementMode();
+
+    // ?좊땲硫붿씠??蹂듦뎄 濡쒖쭅 ?몄텧
+    RestoreBodyAnimClass();
+
+    UE_LOG(LogTemp, Warning, TEXT("Survivor has been revived!"));
 }

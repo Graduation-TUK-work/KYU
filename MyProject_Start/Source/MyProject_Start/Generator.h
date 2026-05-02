@@ -19,8 +19,28 @@ public:
     virtual void CompleteInteract_Implementation() override;
     virtual float GetInteractDuration_Implementation() const override;
 
-    UPROPERTY(VisibleAnywhere, Category = "Generator")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Generator")
+    int32 GeneratorId = -1;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Generator")
     bool bIsRepaired = false;
+
+    UFUNCTION(BlueprintCallable, Category = "Generator")
+    int32 GetGeneratorId() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Generator")
+    float GetRepairProgress() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Generator")
+    bool IsBeingRepaired() const;
+
+    void ApplyNetworkRepairState(bool bInBeingRepaired, bool bInRepaired, float InRepairProgress);
+
+    UFUNCTION(BlueprintImplementableEvent, Category = "Generator")
+    void OnRepairStateChanged(bool bInBeingRepaired, bool bInRepaired, float InRepairProgress);
+
+    UFUNCTION(BlueprintImplementableEvent, Category = "Generator")
+    void OnRepairCompleted();
 
 protected:
     virtual void BeginPlay() override;
@@ -36,5 +56,9 @@ private:
     float RepairDuration = 80.f;
 
     // 현재 수리 중인지
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Generator", meta = (AllowPrivateAccess = "true"))
     bool bIsBeingRepaired = false;
+
+    void AssignGeneratedIdIfNeeded();
+    void SetRepairState(bool bInBeingRepaired, bool bInRepaired, float InRepairProgress);
 };

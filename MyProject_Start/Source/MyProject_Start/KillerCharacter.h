@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -9,6 +9,7 @@
 
 class FNetworkWorker;
 class ATutorialCharacter;
+class AGenerator;
 class UAnimSequence;
 
 UCLASS()
@@ -106,6 +107,9 @@ public:
     UAnimSequence* BodyAttackAnimation;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    UAnimSequence* FirstPersonAttackAnimation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
     UAnimSequence* CarryAnimation;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
@@ -114,7 +118,16 @@ public:
     UPROPERTY(VisibleDefaultsOnly, Category = "Mesh")
     USkeletalMeshComponent* FPSMesh;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera")
+    FVector FirstPersonArmOffset = FVector(40.0f, 0.0f, -180.0f);
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera")
+    FRotator FirstPersonArmRotation = FRotator(0.0f, -90.0f, 0.0f);
+
 private:
+    AGenerator* FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const;
+    void ApplyGeneratorNetworkAction(uint8 ActionType, int32 GeneratorId, const FVector& Location, float RepairProgress);
     void PlayTemporaryBodyAnimation(UAnimSequence* Animation);
     void RestoreBodyAnimClass();
 };
+
