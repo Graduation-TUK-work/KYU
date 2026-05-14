@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
@@ -9,6 +9,7 @@
 class FNetworkWorker;
 class AKillerCharacter;
 class AGenerator;
+class AParkourInteractable;
 class UAnimSequence;
 
 UCLASS()
@@ -21,12 +22,13 @@ public:
 	virtual void UpdateInteract_Implementation(float DeltaTime) override;
 	virtual void CancelInteract_Implementation() override;
 	virtual void CompleteInteract_Implementation() override;
+	virtual float GetInteractDuration_Implementation() const override;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	float RecoveryProgress = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
-	float MaxRecoveryTime = 4.0f;
+	float MaxRecoveryTime = 5.33f;
 
 	UFUNCTION(BlueprintCallable, Category = "PlayerState")
 	void ForceDownedState();
@@ -67,17 +69,26 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
 	UAnimSequence* RepairAnimation;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+	class UAnimMontage* RepairMontage;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
 	bool IsDowned = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
 	bool IsBeingCarried = false;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
+	bool bIsBeingRevived = false;
+
 	void UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
 	void UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
 	void HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw);
 	void SendGeneratorActionToServer(uint8 ActionType, AGenerator* Generator);
 	void SetRepairingGenerator(bool bRepairing);
+	void SetRevivingSurvivor(bool bReviving);
+	void StopInteractingWithCurrentTarget(bool bRestoreAnimation);
+	void StartVaultFromInteractable(AParkourInteractable* ParkourInteractable);
 
 	UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
 	float RemoteForwardValue;
@@ -157,8 +168,15 @@ private:
 	void ShowGeneratorRepairCount() const;
 	AGenerator* FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const;
 	void ApplyGeneratorNetworkAction(uint8 ActionType, int32 GeneratorId, const FVector& Location, float RepairProgress);
+	void SendSurvivorActionToServer(uint8 ActionType, ATutorialCharacter* TargetCharacter);
 	void ApplyHitReaction(bool bRespectCooldown);
 	void PlayTemporaryBodyAnimation(UAnimSequence* Animation);
 	void PlayLoopBodyAnimation(UAnimSequence* Animation);
+	void PlayRepairMontageStart();
+	void PlayRepairMontageEnd();
 	void RestoreBodyAnimClass();
+	bool CanStartVault() const;
+
+	TWeakObjectPtr<ATutorialCharacter> CurrentReviver;
 };
+

@@ -1,4 +1,4 @@
-﻿#include "KillerCharacter.h"
+#include "KillerCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -619,6 +619,62 @@ void AKillerCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId,
         return;
     }
 
+    if (ActionType == ACTION_SURVIVOR_REVIVE_START || ActionType == ACTION_SURVIVOR_REVIVE_CANCEL || ActionType == ACTION_SURVIVOR_REVIVE_COMPLETE)
+    {
+        ATutorialCharacter* Reviver = nullptr;
+        if (RemoteSurvivors.Contains(InstigatorId) && IsValid(RemoteSurvivors[InstigatorId]))
+        {
+            Reviver = RemoteSurvivors[InstigatorId];
+        }
+
+        ATutorialCharacter* Survivor = nullptr;
+        if (RemoteSurvivors.Contains(TargetId) && IsValid(RemoteSurvivors[TargetId]))
+        {
+            Survivor = RemoteSurvivors[TargetId];
+        }
+
+        if (ActionType == ACTION_SURVIVOR_REVIVE_START)
+        {
+            if (Reviver)
+            {
+                Reviver->IsInteracting = true;
+                Reviver->SetRevivingSurvivor(true);
+            }
+
+            if (Survivor)
+            {
+                Survivor->bIsBeingRevived = true;
+            }
+        }
+        else if (ActionType == ACTION_SURVIVOR_REVIVE_CANCEL)
+        {
+            if (Reviver)
+            {
+                Reviver->StopInteractingWithCurrentTarget(true);
+            }
+
+            if (Survivor)
+            {
+                Survivor->bIsBeingRevived = false;
+                Survivor->RecoveryProgress = 0.0f;
+            }
+        }
+        else if (ActionType == ACTION_SURVIVOR_REVIVE_COMPLETE)
+        {
+            if (Survivor && Survivor->IsDowned)
+            {
+                Survivor->CompleteInteract_Implementation();
+            }
+
+            if (Reviver)
+            {
+                Reviver->StopInteractingWithCurrentTarget(true);
+            }
+        }
+
+        return;
+    }
+
     if (ActionType == ACTION_KILLER_ATTACK)
     {
         if (RemoteKillers.Contains(InstigatorId) && IsValid(RemoteKillers[InstigatorId]))
@@ -727,5 +783,6 @@ void AKillerCharacter::RestoreBodyAnimClass()
         }
     }
 }
+
 
 

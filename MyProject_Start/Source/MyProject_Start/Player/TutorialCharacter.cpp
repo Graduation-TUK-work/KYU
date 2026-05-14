@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "MyProject_Start/Player/TutorialCharacter.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -16,6 +16,7 @@
 #include "MyProject_Start/NetworkWorker.h" // 占쌩곤옙
 #include "MyProject_Start/KillerCharacter.h"
 #include "MyProject_Start/Generator.h"
+#include "MyProject_Start/ParkourInteractable.h"
 #include "Networking.h"    // 占쌩곤옙
 #include "Sockets.h"       // 占쌩곤옙
 
@@ -93,6 +94,14 @@ ATutorialCharacter::ATutorialCharacter()
     {
         RepairAnimation = RepairAnimationAsset.Object;
     }
+
+    static ConstructorHelpers::FObjectFinder<UAnimMontage> RepairMontageAsset(
+        TEXT("/Script/Engine.AnimMontage'/Game/Animation/player/AM_Repair.AM_Repair'")
+    );
+    if (RepairMontageAsset.Succeeded())
+    {
+        RepairMontage = RepairMontageAsset.Object;
+    }
     // 占싱듸옙 占쏙옙占쏙옙
     bUseControllerRotationYaw = false;
 
@@ -105,6 +114,8 @@ ATutorialCharacter::ATutorialCharacter()
     GetCharacterMovement()->BrakingDecelerationWalking = 2048.0f;
     GetCharacterMovement()->GroundFriction = 8.0f;
     GetCharacterMovement()->AirControl = 0.2f;
+
+    GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
     // ------------------------------------
 
@@ -172,15 +183,22 @@ void ATutorialCharacter::Tick(float DeltaTime)
     if (IsInteracting && CurrentInteractable)
     {
         AGenerator* Generator = Cast<AGenerator>(CurrentInteractable);
+        ATutorialCharacter* DownedSurvivor = Cast<ATutorialCharacter>(CurrentInteractable);
         if (Generator && Generator->bIsRepaired)
         {
             CancelInteraction();
             return;
         }
 
-        const bool bWasGeneratorRepaired = Generator && Generator->bIsRepaired;
+        if (DownedSurvivor && (!DownedSurvivor->IsDowned || DownedSurvivor->IsBeingCarried))
+        {
+            StopInteractingWithCurrentTarget(true);
+            return;
+        }
 
-        // ?섎━媛 ???앸궗???뚮쭔 ?낅뜲?댄듃 ?ㅽ뻾
+        const bool bWasGeneratorRepaired = Generator && Generator->bIsRepaired;
+        const bool bWasDowned = DownedSurvivor && DownedSurvivor->IsDowned;
+
         IInteractionInterface::Execute_UpdateInteract(CurrentInteractable, DeltaTime);
 
         if (Generator && !bWasGeneratorRepaired && Generator->bIsRepaired)
@@ -189,6 +207,11 @@ void ATutorialCharacter::Tick(float DeltaTime)
             SetRepairingGenerator(false);
             ShowGeneratorRepairCount();
             IsInteracting = false;
+        }
+        else if (DownedSurvivor && bWasDowned && !DownedSurvivor->IsDowned)
+        {
+            SendSurvivorActionToServer(ACTION_SURVIVOR_REVIVE_COMPLETE, DownedSurvivor);
+            StopInteractingWithCurrentTarget(true);
         }
     }
 
@@ -307,7 +330,7 @@ void ATutorialCharacter::EndCrouch() { UnCrouch(); }
 
 void ATutorialCharacter::TryVault()
 {
-    if (bIsVaulting) return;
+    if (!CanStartVault()) return;
 
     FVector Start = GetActorLocation() + FVector(0, 0, 10);
     FVector End = Start + GetActorForwardVector() * 150;
@@ -345,6 +368,28 @@ void ATutorialCharacter::TryVault()
     }
 }
 
+bool ATutorialCharacter::CanStartVault() const
+{
+    return !bIsVaulting && !IsDowned && !IsBeingCarried;
+}
+
+void ATutorialCharacter::StartVaultFromInteractable(AParkourInteractable* ParkourInteractable)
+{
+    if (!CanStartVault() || !ParkourInteractable || !MotionWarping)
+    {
+        return;
+    }
+
+    bIsVaulting = true;
+    VaultAlpha = 0.0f;
+    MotionWarping->AddOrUpdateWarpTargetFromLocation(FName("VaultTarget"), ParkourInteractable->GetVaultTargetLocation());
+
+    if (VaultMontage)
+    {
+        PlayAnimMontage(VaultMontage);
+    }
+}
+
 void ATutorialCharacter::TraceForInteractable()
 {
     if (!Camera) return;
@@ -361,7 +406,7 @@ void ATutorialCharacter::TraceForInteractable()
     Params.AddIgnoredActor(this);
 
     // ?먯젙 踰붿쐞瑜??됰꼮?섍쾶 ?섏뿬 ?꾩썙?덈뒗 ??곷룄 ???≫엳?꾨줉 ?좎? (諛섏?由?40cm)
-    FCollisionShape SphereShape = FCollisionShape::MakeSphere(40.f);
+    FCollisionShape SphereShape = FCollisionShape::MakeSphere(90.f);
 
     TArray<FHitResult> Hits;
     GetWorld()->SweepMultiByChannel(
@@ -396,6 +441,54 @@ void ATutorialCharacter::TraceForInteractable()
             NewInteractable = HitActor;
             break;
         }
+    }
+
+    if (!NewInteractable)
+    {
+        TArray<AActor*> FoundSurvivors;
+        UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATutorialCharacter::StaticClass(), FoundSurvivors);
+
+        const FVector SearchOrigin = Camera->GetComponentLocation();
+        const FVector SearchForward = Camera->GetForwardVector().GetSafeNormal();
+        constexpr float MaxReviveInteractDistance = 500.f;
+        constexpr float MinReviveFacingDot = -0.15f;
+
+        ATutorialCharacter* BestDownedSurvivor = nullptr;
+        float BestScore = TNumericLimits<float>::Max();
+
+        for (AActor* Actor : FoundSurvivors)
+        {
+            ATutorialCharacter* Survivor = Cast<ATutorialCharacter>(Actor);
+            if (!IsValid(Survivor) || Survivor == this || !Survivor->IsDowned || Survivor->IsBeingCarried)
+            {
+                continue;
+            }
+
+            FVector SurvivorTargetLocation = Survivor->GetActorLocation();
+            SurvivorTargetLocation.Z += 50.0f;
+
+            const FVector ToSurvivor = SurvivorTargetLocation - SearchOrigin;
+            const float Distance = ToSurvivor.Size();
+            if (Distance > MaxReviveInteractDistance)
+            {
+                continue;
+            }
+
+            const float FacingDot = FVector::DotProduct(SearchForward, ToSurvivor.GetSafeNormal());
+            if (FacingDot < MinReviveFacingDot)
+            {
+                continue;
+            }
+
+            const float Score = Distance - (FacingDot * 250.f);
+            if (Score < BestScore)
+            {
+                BestScore = Score;
+                BestDownedSurvivor = Survivor;
+            }
+        }
+
+        NewInteractable = BestDownedSurvivor;
     }
 
     if (!NewInteractable)
@@ -448,12 +541,19 @@ void ATutorialCharacter::TraceForInteractable()
         if (IsInteracting && CurrentInteractable)
         {
             AGenerator* Generator = Cast<AGenerator>(CurrentInteractable);
+            ATutorialCharacter* DownedSurvivor = Cast<ATutorialCharacter>(CurrentInteractable);
             IInteractionInterface::Execute_CancelInteract(CurrentInteractable);
             IsInteracting = false;
+            SetRepairingGenerator(false);
+            SetRevivingSurvivor(false);
 
             if (Generator)
             {
                 SendGeneratorActionToServer(ACTION_GENERATOR_CANCEL, Generator);
+            }
+            else if (DownedSurvivor)
+            {
+                SendSurvivorActionToServer(ACTION_SURVIVOR_REVIVE_CANCEL, DownedSurvivor);
             }
         }
         CurrentInteractable = NewInteractable;
@@ -462,6 +562,11 @@ void ATutorialCharacter::TraceForInteractable()
 
 void ATutorialCharacter::StartInteraction()
 {
+    if (IsDowned || IsBeingCarried)
+    {
+        return;
+    }
+
     TraceForInteractable();
 
     if (!CurrentInteractable)
@@ -472,6 +577,11 @@ void ATutorialCharacter::StartInteraction()
 
     if (CurrentInteractable)
     {
+        if (AParkourInteractable* ParkourInteractable = Cast<AParkourInteractable>(CurrentInteractable))
+        {
+            StartVaultFromInteractable(ParkourInteractable);
+            return;
+        }
         // [異붽???濡쒖쭅] ?대? ?섎━??諛쒖쟾湲곗씤吏 ?뺤씤
         if (AGenerator* Generator = Cast<AGenerator>(CurrentInteractable))
         {
@@ -490,6 +600,11 @@ void ATutorialCharacter::StartInteraction()
             SetRepairingGenerator(true);
             SendGeneratorActionToServer(ACTION_GENERATOR_START, Generator);
         }
+        else if (ATutorialCharacter* DownedSurvivor = Cast<ATutorialCharacter>(CurrentInteractable))
+        {
+            SetRevivingSurvivor(true);
+            SendSurvivorActionToServer(ACTION_SURVIVOR_REVIVE_START, DownedSurvivor);
+        }
     }
 }
 
@@ -498,13 +613,19 @@ void ATutorialCharacter::CancelInteraction()
     if (IsInteracting && CurrentInteractable)
     {
         AGenerator* Generator = Cast<AGenerator>(CurrentInteractable);
+        ATutorialCharacter* DownedSurvivor = Cast<ATutorialCharacter>(CurrentInteractable);
         IInteractionInterface::Execute_CancelInteract(CurrentInteractable);
         IsInteracting = false;
         SetRepairingGenerator(false);
+        SetRevivingSurvivor(false);
 
         if (Generator)
         {
             SendGeneratorActionToServer(ACTION_GENERATOR_CANCEL, Generator);
+        }
+        else if (DownedSurvivor)
+        {
+            SendSurvivorActionToServer(ACTION_SURVIVOR_REVIVE_CANCEL, DownedSurvivor);
         }
     }
 }
@@ -521,14 +642,11 @@ void ATutorialCharacter::SetRepairingGenerator(bool bRepairing)
 
     if (bIsRepairingGenerator)
     {
-        if (RepairAnimation)
-        {
-            PlayLoopBodyAnimation(RepairAnimation);
-        }
+        PlayRepairMontageStart();
     }
     else
     {
-        RestoreBodyAnimClass();
+        PlayRepairMontageEnd();
     }
 }
 void ATutorialCharacter::SendGeneratorActionToServer(uint8 ActionType, AGenerator* Generator)
@@ -546,6 +664,26 @@ void ATutorialCharacter::SendGeneratorActionToServer(uint8 ActionType, AGenerato
     ActionPkt.Y = Loc.Y;
     ActionPkt.Z = Loc.Z;
     ActionPkt.RotationYaw = Generator->GetRepairProgress();
+
+    int32 BytesSent = 0;
+    NetworkWorker->GetSocket()->Send((uint8*)&ActionPkt, sizeof(FPacketAction), BytesSent);
+}
+
+void ATutorialCharacter::SendSurvivorActionToServer(uint8 ActionType, ATutorialCharacter* TargetCharacter)
+{
+    if (!TargetCharacter || !NetworkWorker || !NetworkWorker->GetSocket() || MyPlayerId == -1) return;
+
+    FPacketAction ActionPkt;
+    ActionPkt.Type = PKT_ACTION;
+    ActionPkt.ActionType = ActionType;
+    ActionPkt.InstigatorId = MyPlayerId;
+    ActionPkt.TargetId = TargetCharacter->MyPlayerId;
+
+    const FVector Loc = TargetCharacter->GetActorLocation();
+    ActionPkt.X = Loc.X;
+    ActionPkt.Y = Loc.Y;
+    ActionPkt.Z = Loc.Z;
+    ActionPkt.RotationYaw = GetActorRotation().Yaw;
 
     int32 BytesSent = 0;
     NetworkWorker->GetSocket()->Send((uint8*)&ActionPkt, sizeof(FPacketAction), BytesSent);
@@ -649,8 +787,16 @@ void ATutorialCharacter::PlayNetworkHitReaction()
 
 void ATutorialCharacter::ForceDownedState()
 {
+    if (IsInteracting)
+    {
+        CancelInteraction();
+    }
+
     CurrentHealth = 0;
     IsDowned = true;
+    bIsBeingRevived = false;
+    RecoveryProgress = 0.0f;
+    CurrentReviver = nullptr;
     bCanBeHit = false;
 
     if (DownedMontage)
@@ -821,6 +967,72 @@ void ATutorialCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorI
         return;
     }
 
+    if (ActionType == ACTION_SURVIVOR_REVIVE_START || ActionType == ACTION_SURVIVOR_REVIVE_CANCEL || ActionType == ACTION_SURVIVOR_REVIVE_COMPLETE)
+    {
+        ATutorialCharacter* Reviver = nullptr;
+        if (InstigatorId == MyPlayerId)
+        {
+            Reviver = this;
+        }
+        else if (RemotePlayers.Contains(InstigatorId) && IsValid(RemotePlayers[InstigatorId]))
+        {
+            Reviver = RemotePlayers[InstigatorId];
+        }
+
+        ATutorialCharacter* Survivor = nullptr;
+        if (TargetId == MyPlayerId)
+        {
+            Survivor = this;
+        }
+        else if (RemotePlayers.Contains(TargetId) && IsValid(RemotePlayers[TargetId]))
+        {
+            Survivor = RemotePlayers[TargetId];
+        }
+
+        if (ActionType == ACTION_SURVIVOR_REVIVE_START)
+        {
+            if (Reviver)
+            {
+                Reviver->IsInteracting = true;
+                Reviver->SetRevivingSurvivor(true);
+            }
+
+            if (Survivor)
+            {
+                Survivor->bIsBeingRevived = true;
+                Survivor->CurrentReviver = Reviver;
+            }
+        }
+        else if (ActionType == ACTION_SURVIVOR_REVIVE_CANCEL)
+        {
+            if (Reviver)
+            {
+                Reviver->StopInteractingWithCurrentTarget(true);
+            }
+
+            if (Survivor)
+            {
+                Survivor->bIsBeingRevived = false;
+                Survivor->RecoveryProgress = 0.0f;
+                Survivor->CurrentReviver = nullptr;
+            }
+        }
+        else if (ActionType == ACTION_SURVIVOR_REVIVE_COMPLETE)
+        {
+            if (Survivor && Survivor->IsDowned)
+            {
+                Survivor->CompleteInteract_Implementation();
+            }
+
+            if (Reviver)
+            {
+                Reviver->StopInteractingWithCurrentTarget(true);
+            }
+        }
+
+        return;
+    }
+
     if (ActionType == ACTION_KILLER_ATTACK)
     {
         if (RemoteKillers.Contains(InstigatorId) && IsValid(RemoteKillers[InstigatorId]))
@@ -920,6 +1132,39 @@ void ATutorialCharacter::PlayLoopBodyAnimation(UAnimSequence* Animation)
     GetMesh()->PlayAnimation(Animation, true);
 }
 
+void ATutorialCharacter::PlayRepairMontageStart()
+{
+    UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (RepairMontage && AnimInstance)
+    {
+        const bool bIsAlreadyPlaying = AnimInstance->Montage_IsPlaying(RepairMontage);
+        if (!bIsAlreadyPlaying)
+        {
+            AnimInstance->Montage_Play(RepairMontage);
+        }
+
+        AnimInstance->Montage_JumpToSection(FName(TEXT("Start")), RepairMontage);
+        return;
+    }
+
+    if (RepairAnimation)
+    {
+        PlayLoopBodyAnimation(RepairAnimation);
+    }
+}
+
+void ATutorialCharacter::PlayRepairMontageEnd()
+{
+    UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (RepairMontage && AnimInstance && AnimInstance->Montage_IsPlaying(RepairMontage))
+    {
+        AnimInstance->Montage_JumpToSection(FName(TEXT("End")), RepairMontage);
+        return;
+    }
+
+    RestoreBodyAnimClass();
+}
+
 void ATutorialCharacter::RestoreBodyAnimClass()
 {
     if (GetMesh() && !IsDowned && !IsBeingCarried)
@@ -932,19 +1177,50 @@ void ATutorialCharacter::RestoreBodyAnimClass()
     }
 }
 
+void ATutorialCharacter::SetRevivingSurvivor(bool bReviving)
+{
+    if (bReviving)
+    {
+        if (RepairAnimation)
+        {
+            PlayLoopBodyAnimation(RepairAnimation);
+        }
+    }
+    else if (!bIsRepairingGenerator)
+    {
+        RestoreBodyAnimClass();
+    }
+}
+
+void ATutorialCharacter::StopInteractingWithCurrentTarget(bool bRestoreAnimation)
+{
+    IsInteracting = false;
+    SetRepairingGenerator(false);
+
+    if (bRestoreAnimation)
+    {
+        SetRevivingSurvivor(false);
+    }
+}
+
 // 1. ?곹샇?묒슜 ?쒖옉
 void ATutorialCharacter::StartInteract_Implementation(ACharacter* Interactor)
 {
-    // ?닿? ?꾩썙?덉쓣 ?뚮쭔 ??몄씠 ?섎? ?대┫ ???덉쓬
-    if (!IsDowned) return;
+    if (!IsDowned || IsBeingCarried || !Interactor) return;
 
+    ATutorialCharacter* Reviver = Cast<ATutorialCharacter>(Interactor);
+    if (!Reviver || Reviver == this) return;
+
+    CurrentReviver = Reviver;
+    bIsBeingRevived = true;
+    RecoveryProgress = 0.0f;
     UE_LOG(LogTemp, Warning, TEXT("Someone is healing me!"));
 }
 
 // 2. ?곹샇?묒슜 ?낅뜲?댄듃 (吏꾪뻾)
 void ATutorialCharacter::UpdateInteract_Implementation(float DeltaTime)
 {
-    if (!IsDowned) return;
+    if (!IsDowned || !CurrentReviver.IsValid()) return;
 
     RecoveryProgress += DeltaTime / MaxRecoveryTime;
     RecoveryProgress = FMath::Clamp(RecoveryProgress, 0.f, 1.f);
@@ -960,7 +1236,9 @@ void ATutorialCharacter::UpdateInteract_Implementation(float DeltaTime)
 // 3. ?곹샇?묒슜 痍⑥냼
 void ATutorialCharacter::CancelInteract_Implementation()
 {
-    // 移섎즺諛쏅떎媛 以묐떒??
+    bIsBeingRevived = false;
+    RecoveryProgress = 0.0f;
+    CurrentReviver = nullptr;
     UE_LOG(LogTemp, Warning, TEXT("Healing interrupted."));
 }
 
@@ -970,15 +1248,27 @@ void ATutorialCharacter::CompleteInteract_Implementation()
     if (!IsDowned) return;
 
     IsDowned = false;
+    IsBeingCarried = false;
+    bIsBeingRevived = false;
     CurrentHealth = 1; // 遺???곹깭濡?蹂듦뎄
     RecoveryProgress = 0.0f;
+    DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
     // 罹≪뒓 ?믪씠? ?대룞 ?λ젰 蹂듦뎄
     GetCapsuleComponent()->SetCapsuleHalfHeight(88.0f);
     GetCharacterMovement()->SetDefaultMovementMode();
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    bCanBeHit = true;
+    CurrentReviver = nullptr;
 
     // ?좊땲硫붿씠??蹂듦뎄 濡쒖쭅 ?몄텧
     RestoreBodyAnimClass();
 
     UE_LOG(LogTemp, Warning, TEXT("Survivor has been revived!"));
 }
+
+float ATutorialCharacter::GetInteractDuration_Implementation() const
+{
+    return MaxRecoveryTime;
+}
+
