@@ -9,6 +9,7 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimInstance.h"
 #include "UObject/ConstructorHelpers.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -21,6 +22,16 @@
 #include "MyProject_Start/ParkourInteractable.h"
 #include "Networking.h"    // ?좎뙥怨ㅼ삕
 #include "Sockets.h"       // ?좎뙥怨ㅼ삕
+#include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/Texture2D.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SConstraintCanvas.h"
+#include "Widgets/SOverlay.h"
+#include "Widgets/Text/STextBlock.h"
 
 ATutorialCharacter::ATutorialCharacter()
 {
@@ -139,21 +150,38 @@ void ATutorialCharacter::BeginPlay()
 
     if (IsPlayerControlled() && IsLocallyControlled())
     {
+        ApplyLocalPlayerInputMode();
         RemotePlayers.Empty();
+        ShowGeneratorRepairWidget(nullptr);
     }
 
     if (IsPlayerControlled() && IsLocallyControlled())
     {
-        FString ServerIP = FNetworkWorker::GetDefaultServerIP();
+        FString ServerIP;
         if (UMyGameInstance* GI = GetGameInstance<UMyGameInstance>())
         {
-            ServerIP = GI->GetServerIP();
+            if (GI->HasValidatedServerConnection())
+            {
+                ServerIP = GI->GetServerIP();
+            }
+        }
+
+        if (ServerIP.IsEmpty())
+        {
+            UE_LOG(LogTemp, Error, TEXT("Skipping survivor network connect because no validated server IP was provided."));
+            return;
         }
 
         NetworkWorker = new FNetworkWorker(ServerIP, FNetworkWorker::GetDefaultServerPort());
         NetworkWorker->SetOwnerCharacter(this);
         FRunnableThread::Create(NetworkWorker, TEXT("NetworkThread"));
     }
+}
+
+void ATutorialCharacter::PossessedBy(AController* NewController)
+{
+    Super::PossessedBy(NewController);
+    ApplyLocalPlayerInputMode();
 }
 
 void ATutorialCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -164,6 +192,8 @@ void ATutorialCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
         NetworkWorker->Stop();
         // ?좎뙣紐뚯삕 ?좎룞?쇿뜝?숈삕?좎룞???좎?紐뚯삕?좎뙓?몄삕?좎룞??泥섇뜝?숈삕?좎룞??
     }
+
+    HideGeneratorRepairWidget();
 
     Super::EndPlay(EndPlayReason);
     RemotePlayers.Empty();
@@ -181,6 +211,11 @@ void ATutorialCharacter::Tick(float DeltaTime)
 
     if (IsPlayerControlled() && IsLocallyControlled())
     {
+        if (!GeneratorRepairWidget.IsValid())
+        {
+            ShowGeneratorRepairWidget(nullptr);
+        }
+
         SendLocationToServer();
     }
 
@@ -210,10 +245,24 @@ void ATutorialCharacter::Tick(float DeltaTime)
 
         IInteractionInterface::Execute_UpdateInteract(CurrentInteractable, DeltaTime);
 
+        if (Generator)
+        {
+            UpdateGeneratorRepairWidget(Generator);
+
+            GeneratorRepairSyncAccumulator += DeltaTime;
+            if (GeneratorRepairSyncAccumulator >= 0.15f)
+            {
+                GeneratorRepairSyncAccumulator = 0.0f;
+                SendGeneratorActionToServer(ACTION_GENERATOR_START, Generator);
+            }
+        }
+
         if (Generator && !bWasGeneratorRepaired && Generator->bIsRepaired)
         {
             SendGeneratorActionToServer(ACTION_GENERATOR_COMPLETE, Generator);
             SetRepairingGenerator(false);
+            GeneratorRepairSyncAccumulator = 0.0f;
+            UpdateGeneratorRepairWidget(Generator);
             ShowGeneratorRepairCount();
             IsInteracting = false;
         }
@@ -277,6 +326,9 @@ void ATutorialCharacter::SendLocationToServer()
 
         // 3. ???곫묾??怨밴묶 ?紐낅샒 (疫꿸퀣???꾨뗀諭??醫?)
         MovePkt.Data.bIsSprinting = (GetCharacterMovement()->MaxWalkSpeed > 350.0f);
+        MovePkt.Data.CurrentHealth = CurrentHealth;
+        MovePkt.Data.bIsDowned = IsDowned;
+        MovePkt.Data.bIsBeingCarried = IsBeingCarried;
 
 
         // 4. ??뺤쒔嚥??袁⑸꽊
@@ -600,6 +652,8 @@ void ATutorialCharacter::TraceForInteractable()
             IsInteracting = false;
             SetRepairingGenerator(false);
             SetRevivingSurvivor(false);
+            GeneratorRepairSyncAccumulator = 0.0f;
+            UpdateGeneratorRepairWidget(Generator);
 
             if (Generator)
             {
@@ -681,6 +735,8 @@ void ATutorialCharacter::StartInteraction()
         if (AGenerator* Generator = Cast<AGenerator>(CurrentInteractable))
         {
             SetRepairingGenerator(true);
+            UpdateGeneratorRepairWidget(Generator);
+            GeneratorRepairSyncAccumulator = 0.0f;
             SendGeneratorActionToServer(ACTION_GENERATOR_START, Generator);
         }
         else if (ATutorialCharacter* DownedSurvivor = Cast<ATutorialCharacter>(CurrentInteractable))
@@ -701,6 +757,8 @@ void ATutorialCharacter::CancelInteraction()
         IsInteracting = false;
         SetRepairingGenerator(false);
         SetRevivingSurvivor(false);
+        GeneratorRepairSyncAccumulator = 0.0f;
+        UpdateGeneratorRepairWidget(Generator);
 
         if (Generator)
         {
@@ -823,6 +881,146 @@ void ATutorialCharacter::ShowGeneratorRepairCount() const
         GEngine->AddOnScreenDebugMessage(3001, 4.0f, FColor::Yellow, Message);
     }
 }
+
+void ATutorialCharacter::ShowGeneratorRepairWidget(AGenerator* Generator)
+{
+    if (!IsPlayerControlled() || !IsLocallyControlled() || !GEngine || !GEngine->GameViewport)
+    {
+        return;
+    }
+
+    if (!GeneratorRepairBackgroundTexture)
+    {
+        GeneratorRepairBackgroundTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/1_Map/UI1.UI1"));
+    }
+
+    if (!GeneratorRepairFillMaterial)
+    {
+        GeneratorRepairFillMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/1_Map/C_Progressbar.C_Progressbar"));
+    }
+
+    GeneratorRepairBackgroundBrush = FSlateBrush();
+    GeneratorRepairBackgroundBrush.SetResourceObject(GeneratorRepairBackgroundTexture);
+    GeneratorRepairBackgroundBrush.ImageSize = FVector2D(372.f, 425.f);
+    GeneratorRepairBackgroundBrush.DrawAs = ESlateBrushDrawType::Image;
+
+    if (GeneratorRepairFillMaterial && !GeneratorRepairFillMID1)
+    {
+        GeneratorRepairFillMID1 = UMaterialInstanceDynamic::Create(GeneratorRepairFillMaterial, this);
+        GeneratorRepairFillMID2 = UMaterialInstanceDynamic::Create(GeneratorRepairFillMaterial, this);
+        GeneratorRepairFillMID3 = UMaterialInstanceDynamic::Create(GeneratorRepairFillMaterial, this);
+    }
+
+    GeneratorRepairFillBrush1 = FSlateBrush();
+    GeneratorRepairFillBrush1.SetResourceObject(GeneratorRepairFillMID1);
+    GeneratorRepairFillBrush1.ImageSize = FVector2D(48.f, 48.f);
+    GeneratorRepairFillBrush1.DrawAs = ESlateBrushDrawType::Image;
+
+    GeneratorRepairFillBrush2 = FSlateBrush();
+    GeneratorRepairFillBrush2.SetResourceObject(GeneratorRepairFillMID2);
+    GeneratorRepairFillBrush2.ImageSize = FVector2D(48.f, 48.f);
+    GeneratorRepairFillBrush2.DrawAs = ESlateBrushDrawType::Image;
+
+    GeneratorRepairFillBrush3 = FSlateBrush();
+    GeneratorRepairFillBrush3.SetResourceObject(GeneratorRepairFillMID3);
+    GeneratorRepairFillBrush3.ImageSize = FVector2D(48.f, 48.f);
+    GeneratorRepairFillBrush3.DrawAs = ESlateBrushDrawType::Image;
+
+    if (!GeneratorRepairWidget.IsValid())
+    {
+        SAssignNew(GeneratorRepairWidget, SConstraintCanvas)
+            + SConstraintCanvas::Slot()
+            .Anchors(FAnchors(0.f, 0.5f))
+            .Alignment(FVector2D(0.f, 0.5f))
+            .Offset(FMargin(24.f, 0.f, 372.f, 425.f))
+            .AutoSize(true)
+            [
+                SNew(SBox)
+                .WidthOverride(372.f)
+                .HeightOverride(425.f)
+                [
+                    SNew(SOverlay)
+                    + SOverlay::Slot()
+                    .ZOrder(0)
+                    [
+                        SNew(SImage)
+                        .Image(&GeneratorRepairBackgroundBrush)
+                    ]
+                    + SOverlay::Slot()
+                    .ZOrder(10)
+                    [
+                        SNew(SConstraintCanvas)
+                        + SConstraintCanvas::Slot()
+                        .Offset(FMargin(300.f, 139.f, 48.f, 48.f))
+                        [
+                            SAssignNew(GeneratorRepairProgressImage1, SImage)
+                            .Image(&GeneratorRepairFillBrush1)
+                        ]
+                        + SConstraintCanvas::Slot()
+                        .Offset(FMargin(300.f, 264.f, 48.f, 48.f))
+                        [
+                            SAssignNew(GeneratorRepairProgressImage2, SImage)
+                            .Image(&GeneratorRepairFillBrush2)
+                        ]
+                        + SConstraintCanvas::Slot()
+                        .Offset(FMargin(300.f, 373.f, 48.f, 48.f))
+                        [
+                            SAssignNew(GeneratorRepairProgressImage3, SImage)
+                            .Image(&GeneratorRepairFillBrush3)
+                        ]
+                    ]
+                ]
+            ];
+
+        GEngine->GameViewport->AddViewportWidgetContent(GeneratorRepairWidget.ToSharedRef(), 60);
+    }
+
+    UpdateGeneratorRepairWidget(Generator);
+}
+
+void ATutorialCharacter::UpdateGeneratorRepairWidget(AGenerator* Generator)
+{
+    if (!GeneratorRepairWidget.IsValid())
+    {
+        return;
+    }
+
+    if (Generator)
+    {
+        const int32 ActiveGeneratorIndex = FMath::Clamp(Generator->GetGeneratorId(), 0, 2);
+        GeneratorRepairProgressValues[ActiveGeneratorIndex] = FMath::Clamp(Generator->GetRepairProgress(), 0.f, 1.f);
+    }
+
+    if (GeneratorRepairFillMID1)
+    {
+        GeneratorRepairFillMID1->SetScalarParameterValue(TEXT("Progress"), GeneratorRepairProgressValues[0]);
+    }
+
+    if (GeneratorRepairFillMID2)
+    {
+        GeneratorRepairFillMID2->SetScalarParameterValue(TEXT("Progress"), GeneratorRepairProgressValues[1]);
+    }
+
+    if (GeneratorRepairFillMID3)
+    {
+        GeneratorRepairFillMID3->SetScalarParameterValue(TEXT("Progress"), GeneratorRepairProgressValues[2]);
+    }
+}
+
+void ATutorialCharacter::HideGeneratorRepairWidget()
+{
+    if (GeneratorRepairWidget.IsValid() && GEngine && GEngine->GameViewport)
+    {
+        GEngine->GameViewport->RemoveViewportWidgetContent(GeneratorRepairWidget.ToSharedRef());
+    }
+
+    GeneratorRepairWidget.Reset();
+    GeneratorRepairProgressImage1.Reset();
+    GeneratorRepairProgressImage2.Reset();
+    GeneratorRepairProgressImage3.Reset();
+    GeneratorRepairText.Reset();
+}
+
 AGenerator* ATutorialCharacter::FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const
 {
     UWorld* World = GetWorld();
@@ -895,15 +1093,18 @@ void ATutorialCharacter::ApplyGeneratorNetworkAction(uint8 ActionType, int32 Gen
     if (ActionType == ACTION_GENERATOR_START)
     {
         Generator->ApplyNetworkRepairState(true, false, RepairProgress);
+        UpdateGeneratorRepairWidget(Generator);
     }
     else if (ActionType == ACTION_GENERATOR_CANCEL)
     {
         Generator->ApplyNetworkRepairState(false, false, RepairProgress);
+        UpdateGeneratorRepairWidget(Generator);
     }
     else if (ActionType == ACTION_GENERATOR_COMPLETE)
     {
         const bool bWasRepaired = Generator->bIsRepaired;
         Generator->ApplyNetworkRepairState(false, true, 1.f);
+        UpdateGeneratorRepairWidget(Generator);
         if (!bWasRepaired)
         {
             ShowGeneratorRepairCount();
@@ -943,13 +1144,34 @@ void ATutorialCharacter::ForceDownedState()
     CurrentReviver = nullptr;
     bCanBeHit = false;
 
+    float DownedMontageLength = 0.0f;
     if (DownedMontage)
     {
-        PlayAnimMontage(DownedMontage);
+        DownedMontageLength = PlayAnimMontage(DownedMontage);
     }
-    else if (DownedAnimation)
+
+    if (DownedAnimation)
     {
-        PlayLoopBodyAnimation(DownedAnimation);
+        if (DownedMontageLength > 0.0f)
+        {
+            FTimerHandle DownedLoopTimer;
+            GetWorldTimerManager().SetTimer(
+                DownedLoopTimer,
+                FTimerDelegate::CreateLambda([this]()
+                    {
+                        if (IsValid(this) && IsDowned && !IsBeingCarried)
+                        {
+                            PlayLoopBodyAnimation(DownedAnimation);
+                        }
+                    }),
+                DownedMontageLength,
+                false
+            );
+        }
+        else
+        {
+            PlayLoopBodyAnimation(DownedAnimation);
+        }
     }
 
     GetCapsuleComponent()->SetCapsuleHalfHeight(30.0f);
@@ -1024,7 +1246,7 @@ void ATutorialCharacter::ApplyHitReaction(bool bRespectCooldown)
     }
 }
 
-void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint)
+void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint, int32 InHealth, bool bInDowned, bool bInBeingCarried)
 {
     UWorld* World = GetWorld();
     if (!World || World->bIsTearingDown) return;
@@ -1045,6 +1267,7 @@ void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, fl
             Target->RemoteForwardValue = Forward;
             Target->RemoteRightValue = Right;
             Target->RemoteIsSprinting = bSprint;
+            Target->SyncRemoteState(InHealth, bInDowned, bInBeingCarried);
 
             // ?좎룞?쇿뜝?⑹꽌 ?좎뙃?쎌삕 ?좎룞?쇿뜝?숈삕 (?좎룞?쇿뜝?숈삕?좎룞?쇿뜝?숈삕?좎룞???좎룞?쇿뜝?숈삕?좎룞?숉듃?좎룞??
             return;
@@ -1073,12 +1296,59 @@ void ATutorialCharacter::UpdateRemotePlayer(int32 PlayerId, FVector Location, fl
 
         // [?곕떽?] ?諭??筌뤴뫀?????됱뵠?? 筌?쑬瑗?Visibility)???類ㅻ뼄??'Block'??롫즲嚥???쇱젟??몃빍??
         NewPlayer->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+        NewPlayer->SyncRemoteState(InHealth, bInDowned, bInBeingCarried);
 
         NewPlayer->DisableInput(nullptr);
         RemotePlayers.Add(PlayerId, NewPlayer);
         UE_LOG(LogTemp, Warning, TEXT("New Remote Player Spawned! ID: %d"), PlayerId);
     }
 }
+
+void ATutorialCharacter::SyncRemoteState(int32 InHealth, bool bInDowned, bool bInBeingCarried)
+{
+    CurrentHealth = InHealth;
+    IsBeingCarried = bInBeingCarried;
+
+    if (bInDowned)
+    {
+        if (!IsDowned)
+        {
+            ForceDownedState();
+        }
+
+        CurrentHealth = 0;
+        IsBeingCarried = bInBeingCarried;
+        return;
+    }
+
+    if (IsDowned)
+    {
+        if (InHealth <= 1)
+        {
+            ForceInjuredState();
+        }
+        else
+        {
+            IsDowned = false;
+            IsBeingCarried = false;
+            bIsBeingRevived = false;
+            bIsSelfReviving = false;
+            RecoveryProgress = 0.0f;
+            CurrentReviver = nullptr;
+            bCanBeHit = true;
+            GetCapsuleComponent()->SetCapsuleHalfHeight(88.0f);
+            GetCharacterMovement()->SetDefaultMovementMode();
+            GetCharacterMovement()->bOrientRotationToMovement = true;
+            GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+            bUseControllerRotationYaw = false;
+            RestoreBodyAnimClass();
+        }
+    }
+
+    CurrentHealth = InHealth;
+    IsBeingCarried = bInBeingCarried;
+}
+
 void ATutorialCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint)
 {
     UWorld* World = GetWorld();
@@ -1411,6 +1681,18 @@ void ATutorialCharacter::RestoreBodyAnimClass()
     }
 }
 
+void ATutorialCharacter::ApplyLocalPlayerInputMode()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC || !PC->IsLocalController())
+    {
+        return;
+    }
+
+    FInputModeGameOnly InputMode;
+    PC->SetInputMode(InputMode);
+    PC->bShowMouseCursor = false;
+}
 void ATutorialCharacter::SetRevivingSurvivor(bool bReviving)
 {
     if (bReviving)

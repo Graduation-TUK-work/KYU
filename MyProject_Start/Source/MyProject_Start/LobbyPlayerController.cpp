@@ -4,8 +4,12 @@
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Kismet/GameplayStatics.h"
 #include "MyGameInstance.h"
+#include "NetworkWorker.h"
 #include "Networking.h"
+#include "Sockets.h"
+#include "SocketSubsystem.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -33,7 +37,18 @@ void ALobbyPlayerController::BeginPlay()
     FInputModeUIOnly InputMode;
     SetInputMode(InputMode);
 
-    ShowServerIpWidget();
+    FString MapName = GetWorld() ? GetWorld()->GetMapName() : FString();
+    MapName.RemoveFromStart(TEXT("UEDPIE_0_"));
+    MapName.RemoveFromStart(TEXT("UEDPIE_1_"));
+
+    if (MapName.Contains(TEXT("Title_Map")))
+    {
+        ShowServerIpWidget();
+    }
+    else
+    {
+        ShowLobbyWidget();
+    }
 }
 
 void ALobbyPlayerController::ShowServerIpWidget()
@@ -137,9 +152,17 @@ FReply ALobbyPlayerController::HandleServerIpConfirmed()
         return FReply::Handled();
     }
 
+    FText ConnectionError;
+    if (!TryConnectToConfiguredServer(EnteredIP, ConnectionError))
+    {
+        SetServerIpError(ConnectionError);
+        return FReply::Handled();
+    }
+
     if (UMyGameInstance* GI = GetGameInstance<UMyGameInstance>())
     {
         GI->SetServerIP(EnteredIP);
+        UE_LOG(LogTemp, Warning, TEXT("Validated server IP saved from title screen: %s"), *EnteredIP);
     }
 
     if (GEngine && GEngine->GameViewport && ServerIpWidget.IsValid())
@@ -151,8 +174,51 @@ FReply ALobbyPlayerController::HandleServerIpConfirmed()
     ServerIpTextBox.Reset();
     ServerIpErrorText.Reset();
 
-    ShowLobbyWidget();
+    UGameplayStatics::OpenLevel(this, FName(TEXT("Lobby_Map")));
     return FReply::Handled();
+}
+
+bool ALobbyPlayerController::TryConnectToConfiguredServer(const FString& InServerIP, FText& OutErrorText) const
+{
+    FIPv4Address ParsedAddress;
+    if (!FIPv4Address::Parse(InServerIP, ParsedAddress))
+    {
+        OutErrorText = FText::FromString(TEXT("Invalid IPv4 address."));
+        return false;
+    }
+
+    ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+    if (!SocketSubsystem)
+    {
+        OutErrorText = FText::FromString(TEXT("Socket subsystem is not available."));
+        return false;
+    }
+
+    FSocket* TestSocket = SocketSubsystem->CreateSocket(NAME_Stream, TEXT("LobbyServerProbe"), false);
+    if (!TestSocket)
+    {
+        OutErrorText = FText::FromString(TEXT("Failed to create a test socket."));
+        return false;
+    }
+
+    TestSocket->SetNonBlocking(false);
+    TestSocket->SetReuseAddr(false);
+
+    TSharedRef<FInternetAddr> Address = SocketSubsystem->CreateInternetAddr();
+    Address->SetIp(ParsedAddress.Value);
+    Address->SetPort(FNetworkWorker::GetDefaultServerPort());
+
+    const bool bConnected = TestSocket->Connect(*Address);
+    TestSocket->Close();
+    SocketSubsystem->DestroySocket(TestSocket);
+
+    if (!bConnected)
+    {
+        OutErrorText = FText::FromString(TEXT("Could not connect to the server with that IP."));
+        return false;
+    }
+
+    return true;
 }
 
 void ALobbyPlayerController::HandleServerIpCommitted(const FText& Text, ETextCommit::Type CommitMethod)

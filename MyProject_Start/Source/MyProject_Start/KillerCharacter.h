@@ -27,6 +27,7 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void PossessedBy(AController* NewController) override;
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void CheckHit();
@@ -72,7 +73,7 @@ public:
 
     void SendLocationToServer();
     void UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
-    void UpdateRemoteSurvivor(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
+    void UpdateRemoteSurvivor(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint, int32 InHealth, bool bInDowned, bool bInBeingCarried);
     void HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw);
     void SendActionToServer(uint8 ActionType, int32 TargetId = -1);
     void PlayCarryAnimation();
@@ -125,6 +126,7 @@ public:
     FRotator FirstPersonArmRotation = FRotator(0.0f, -90.0f, 0.0f);
 
 private:
+    void ApplyLocalPlayerInputMode();
     AGenerator* FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const;
     void ApplyGeneratorNetworkAction(uint8 ActionType, int32 GeneratorId, const FVector& Location, float RepairProgress);
     void PlayTemporaryBodyAnimation(UAnimSequence* Animation);

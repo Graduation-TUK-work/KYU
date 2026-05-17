@@ -22,6 +22,7 @@ public:
     void OnGeneratorRepaired();
 
 protected:
+    FTransform GetSafeSpawnTransform() const;
     FVector GetSafeSpawnLocation() const;
     bool TryGetSpawnLocationOnPlane(const FString& PlaneName, FVector& OutLocation) const;
 

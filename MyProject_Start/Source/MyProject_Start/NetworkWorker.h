@@ -24,6 +24,8 @@ public:
     void SetOwnerKiller(AKillerCharacter* InCharacter) { OwnerKillerCharacter = InCharacter; OwnerTutorialCharacter = nullptr; }
 
 private:
+    void SendRoleSelection(uint8 Role);
+
     FSocket* Socket;
     FString ServerIP;
     int32 ServerPort;

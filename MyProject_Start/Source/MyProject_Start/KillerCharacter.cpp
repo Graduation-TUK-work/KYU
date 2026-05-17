@@ -1,6 +1,7 @@
 ﻿#include "KillerCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -124,15 +125,25 @@ void AKillerCharacter::BeginPlay()
 
     if (IsPlayerControlled() && IsLocallyControlled())
     {
+        ApplyLocalPlayerInputMode();
         RemoteKillers.Empty();
         RemoteSurvivors.Empty();
 
         if (NetworkWorker == nullptr)
         {
-            FString ServerIP = FNetworkWorker::GetDefaultServerIP();
+            FString ServerIP;
             if (UMyGameInstance* GI = GetGameInstance<UMyGameInstance>())
             {
-                ServerIP = GI->GetServerIP();
+                if (GI->HasValidatedServerConnection())
+                {
+                    ServerIP = GI->GetServerIP();
+                }
+            }
+
+            if (ServerIP.IsEmpty())
+            {
+                UE_LOG(LogTemp, Error, TEXT("Skipping killer network connect because no validated server IP was provided."));
+                return;
             }
 
             NetworkWorker = new FNetworkWorker(ServerIP, FNetworkWorker::GetDefaultServerPort());
@@ -145,6 +156,12 @@ void AKillerCharacter::BeginPlay()
     {
         GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Killer Character Spawned"));
     }
+}
+
+void AKillerCharacter::PossessedBy(AController* NewController)
+{
+    Super::PossessedBy(NewController);
+    ApplyLocalPlayerInputMode();
 }
 
 void AKillerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -183,6 +200,19 @@ void AKillerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     PlayerInputComponent->BindAxis("LookUp", this, &AKillerCharacter::AddControllerPitchInput);
     PlayerInputComponent->BindAction("Attack", IE_Pressed, this, &AKillerCharacter::StartAttack);
     PlayerInputComponent->BindAction("Pickup", IE_Pressed, this, &AKillerCharacter::PickupSurvivor);
+}
+
+void AKillerCharacter::ApplyLocalPlayerInputMode()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC || !PC->IsLocalController())
+    {
+        return;
+    }
+
+    FInputModeGameOnly InputMode;
+    PC->SetInputMode(InputMode);
+    PC->bShowMouseCursor = false;
 }
 
 void AKillerCharacter::MoveForward(float AxisValue)
@@ -448,15 +478,25 @@ void AKillerCharacter::SendLocationToServer()
         MovePkt.Data.PlayerId = MyPlayerId;
         MovePkt.Data.CharacterType = CHARACTER_KILLER; // ??곸뵥筌?????
 
-        MovePkt.Data.X = GetActorLocation().X;
-        MovePkt.Data.Y = GetActorLocation().Y;
-        MovePkt.Data.Z = GetActorLocation().Z;
-        MovePkt.Data.RotationYaw = GetActorRotation().Yaw;
+        const FVector CurrentLocation = GetActorLocation();
+        MovePkt.Data.X = CurrentLocation.X;
+        MovePkt.Data.Y = CurrentLocation.Y;
+        MovePkt.Data.Z = CurrentLocation.Z;
+
+        const FVector HorizontalVelocity(GetVelocity().X, GetVelocity().Y, 0.0f);
+        const bool bHasMeaningfulMovement = HorizontalVelocity.SizeSquared() > 25.0f;
+        const float VisualYaw = bHasMeaningfulMovement
+            ? HorizontalVelocity.Rotation().Yaw
+            : GetActorRotation().Yaw;
+        MovePkt.Data.RotationYaw = VisualYaw;
 
         // [餓λ쵐?? ??얜즲 ?④쑴沅???????낆젾揶쏅???筌욊낯???節뚮뮸??덈뼄.
         MovePkt.Data.ForwardValue = MoveForwardValue;
         MovePkt.Data.RightValue = MoveRightValue;
         MovePkt.Data.bIsSprinting = false;
+        MovePkt.Data.CurrentHealth = 2;
+        MovePkt.Data.bIsDowned = false;
+        MovePkt.Data.bIsBeingCarried = false;
 
         int32 BytesSent = 0;
         NetworkWorker->GetSocket()->Send((uint8*)&MovePkt, sizeof(FPacketMove), BytesSent);
@@ -503,7 +543,7 @@ void AKillerCharacter::UpdateRemoteKiller(int32 PlayerId, FVector Location, floa
     }
 }
 
-void AKillerCharacter::UpdateRemoteSurvivor(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint)
+void AKillerCharacter::UpdateRemoteSurvivor(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint, int32 InHealth, bool bInDowned, bool bInBeingCarried)
 {
     UWorld* World = GetWorld();
     if (!World || World->bIsTearingDown) return;
@@ -519,6 +559,7 @@ void AKillerCharacter::UpdateRemoteSurvivor(int32 PlayerId, FVector Location, fl
             Target->RemoteForwardValue = Forward;
             Target->RemoteRightValue = Right;
             Target->RemoteIsSprinting = bSprint;
+            Target->SyncRemoteState(InHealth, bInDowned, bInBeingCarried);
             return;
         }
 
@@ -534,6 +575,7 @@ void AKillerCharacter::UpdateRemoteSurvivor(int32 PlayerId, FVector Location, fl
         NewSurvivor->MyPlayerId = PlayerId;
         NewSurvivor->AutoPossessPlayer = EAutoReceiveInput::Disabled;
         NewSurvivor->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        NewSurvivor->SyncRemoteState(InHealth, bInDowned, bInBeingCarried);
         NewSurvivor->DisableInput(nullptr);
         RemoteSurvivors.Add(PlayerId, NewSurvivor);
         UE_LOG(LogTemp, Warning, TEXT("New Remote Survivor Spawned! ID: %d"), PlayerId);

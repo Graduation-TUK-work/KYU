@@ -19,6 +19,9 @@ public:
     UPROPERTY(BlueprintReadWrite, Category = "Network")
     FString ServerIP;
 
+    UPROPERTY(BlueprintReadOnly, Category = "Network")
+    bool bHasValidatedServerConnection = false;
+
     UFUNCTION(BlueprintCallable, Category = "Lobby")
     void SelectKiller();
 
@@ -51,4 +54,7 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Network")
     FString GetServerIP() const;
+
+    UFUNCTION(BlueprintPure, Category = "Network")
+    bool HasValidatedServerConnection() const;
 };

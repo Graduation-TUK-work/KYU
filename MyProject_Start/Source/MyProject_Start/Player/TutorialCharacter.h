@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Styling/SlateBrush.h"
 #include "GameFramework/Character.h"
 #include "MotionWarpingComponent.h"
 #include "MyProject_Start/InteractionInterface.h"
@@ -12,6 +13,12 @@ class AGenerator;
 class ABandagePickup;
 class AParkourInteractable;
 class UAnimSequence;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UTexture2D;
+class SImage;
+class STextBlock;
+class SWidget;
 
 UCLASS()
 class MYPROJECT_START_API ATutorialCharacter : public ACharacter, public IInteractionInterface
@@ -94,7 +101,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	bool bHasBandage = false;
 
-	void UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
+	void UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint, int32 InHealth, bool bInDowned, bool bInBeingCarried);
 	void UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
 	void HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw);
 	void SendGeneratorActionToServer(uint8 ActionType, AGenerator* Generator);
@@ -116,6 +123,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void PossessedBy(AController* NewController) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Status")
 	int32 CurrentHealth = 2;
@@ -128,6 +136,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Status")
 	bool IsInjured() const { return CurrentHealth == 1 && !IsDowned && !IsBeingCarried; }
+
+	UFUNCTION(BlueprintPure, Category = "Status")
+	int32 GetCurrentHealth() const { return CurrentHealth; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetCanVault(bool CanIt) { bCanVault = CanIt; }
@@ -153,6 +164,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void PlayHitReaction();
 	void PlayNetworkHitReaction();
+	void SyncRemoteState(int32 InHealth, bool bInDowned, bool bInBeingCarried);
 
 	FNetworkWorker* NetworkWorker;
 
@@ -185,6 +197,9 @@ protected:
 
 private:
 	void ShowGeneratorRepairCount() const;
+	void ShowGeneratorRepairWidget(AGenerator* Generator);
+	void UpdateGeneratorRepairWidget(AGenerator* Generator);
+	void HideGeneratorRepairWidget();
 	AGenerator* FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const;
 	ABandagePickup* FindBandageForNetworkAction(int32 BandageId, const FVector& Location) const;
 	void ApplyGeneratorNetworkAction(uint8 ActionType, int32 GeneratorId, const FVector& Location, float RepairProgress);
@@ -196,11 +211,38 @@ private:
 	void PlayRepairMontageStart();
 	void PlayRepairMontageEnd();
 	void RestoreBodyAnimClass();
+	void ApplyLocalPlayerInputMode();
 	bool CanStartVault() const;
 	void BeginVaultToLocation(const FVector& TargetLocation);
 	void FinishVault();
 
+	TSharedPtr<SWidget> GeneratorRepairWidget;
+	TSharedPtr<SImage> GeneratorRepairProgressImage1;
+	TSharedPtr<SImage> GeneratorRepairProgressImage2;
+	TSharedPtr<SImage> GeneratorRepairProgressImage3;
+	TSharedPtr<STextBlock> GeneratorRepairText;
+	FSlateBrush GeneratorRepairBackgroundBrush;
+	FSlateBrush GeneratorRepairFillBrush1;
+	FSlateBrush GeneratorRepairFillBrush2;
+	FSlateBrush GeneratorRepairFillBrush3;
+	float GeneratorRepairProgressValues[3] = { 0.f, 0.f, 0.f };
+	float GeneratorRepairSyncAccumulator = 0.f;
+
+	UPROPERTY(Transient)
+	UTexture2D* GeneratorRepairBackgroundTexture = nullptr;
+
+	UPROPERTY(Transient)
+	UMaterialInterface* GeneratorRepairFillMaterial = nullptr;
+
+	UPROPERTY(Transient)
+	UMaterialInstanceDynamic* GeneratorRepairFillMID1 = nullptr;
+
+	UPROPERTY(Transient)
+	UMaterialInstanceDynamic* GeneratorRepairFillMID2 = nullptr;
+
+	UPROPERTY(Transient)
+	UMaterialInstanceDynamic* GeneratorRepairFillMID3 = nullptr;
+
 	TWeakObjectPtr<ATutorialCharacter> CurrentReviver;
 	FTimerHandle VaultFinishTimerHandle;
 };
-

@@ -1,4 +1,4 @@
-#include "NetworkWorker.h"
+ï»¿#include "NetworkWorker.h"
 #include "Networking.h"
 #include "Sockets.h"
 #include "SocketSubsystem.h"
@@ -30,16 +30,16 @@ FNetworkWorker::FNetworkWorker(FString IP, int32 Port)
 
 FString FNetworkWorker::GetDefaultServerIP()
 {
-    FString ConfiguredIP = DefaultServerIp; // ±âº»°ª 127.0.0.1
+    FString ConfiguredIP = DefaultServerIp; // ê¸°ë³¸ê°’ 127.0.0.1
 
-    // [ÇÙ½É Ãß°¡] ½ÇÇàÇÒ ¶§ ³Ñ°ÜÁØ -IP= ÁÖ¼Ò°¡ ÀÖ´ÂÁö ¸ÕÀú È®ÀÎÇÕ´Ï´Ù.
+    // [í•µì‹¬ ì¶”ê°€] ì‹¤í–‰í•  ë•Œ ë„˜ê²¨ì¤€ -IP= ì£¼ì†Œê°€ ìžˆëŠ”ì§€ ë¨¼ì € í™•ì¸í•©ë‹ˆë‹¤.
     if (FParse::Value(FCommandLine::Get(), TEXT("-IP="), ConfiguredIP))
     {
         UE_LOG(LogTemp, Warning, TEXT("Command Line IP Found: %s"), *ConfiguredIP);
         return ConfiguredIP;
     }
 
-    // ±âÁ¸ INI ·ÎÁ÷ (¸¸¾àÀ» À§ÇØ ³²°ÜµÒ)
+    // ê¸°ì¡´ INI ë¡œì§ (ë§Œì•½ì„ ìœ„í•´ ë‚¨ê²¨ë‘ )
     if (GConfig)
     {
         GConfig->GetString(NetworkConfigSection, ServerIpKey, ConfiguredIP, GGameIni);
@@ -58,6 +58,22 @@ int32 FNetworkWorker::GetDefaultServerPort()
     }
 
     return ConfiguredPort > 0 ? ConfiguredPort : DefaultServerPort;
+}
+
+void FNetworkWorker::SendRoleSelection(uint8 Role)
+{
+    if (!Socket || CachedMyPlayerId < 0)
+    {
+        return;
+    }
+
+    FPacketRoleSelect RolePkt{};
+    RolePkt.Type = PKT_ROLE_SELECT;
+    RolePkt.PlayerId = CachedMyPlayerId;
+    RolePkt.Role = Role;
+
+    int32 BytesSent = 0;
+    Socket->Send(reinterpret_cast<const uint8*>(&RolePkt), sizeof(RolePkt), BytesSent);
 }
 
 bool FNetworkWorker::Init()
@@ -136,90 +152,17 @@ uint32 FNetworkWorker::Run()
 
                     AsyncTask(ENamedThreads::GameThread, [this, AssignedId = JoinPkt->MyId]()
                         {
-                            // 1. ³»°¡ ¼­¹öÀÇ Ã¹ Á¢¼ÓÀÚ(ID: 0)¶ó¼­ »ìÀÎ¸¶·Î ÁöÁ¤µÇ¾ú´Ù¸é!
-                            if (AssignedId == 0)
+                            if (IsValid(OwnerTutorialCharacter))
                             {
-                                if (IsValid(OwnerTutorialCharacter))
-                                {
-                                    UWorld* World = OwnerTutorialCharacter->GetWorld();
-                                    APlayerController* PC = Cast<APlayerController>(OwnerTutorialCharacter->GetController());
-
-                                    if (World && PC)
-                                    {
-                                        // ---- [¼öÁ¤µÈ ºÎºÐ: SpawnPoint Ã£±â] ----
-                                        FTransform SpawnTransform = OwnerTutorialCharacter->GetActorTransform(); // ±âº»°ª: ÇöÀç À§Ä¡
-
-                                        TArray<AActor*> FoundPoints;
-                                        UGameplayStatics::GetAllActorsOfClass(World, ASpawnPoint::StaticClass(), FoundPoints);
-
-                                        for (AActor* Point : FoundPoints)
-                                        {
-                                            ASpawnPoint* SP = Cast<ASpawnPoint>(Point);
-                                            if (SP && SP->SpawnTeam == ETeamType::Killer) // Å³·¯¿ë ½ºÆù Æ÷ÀÎÆ®¸¦ Ã£À¸¸é
-                                            {
-                                                SpawnTransform = SP->GetActorTransform();
-                                                break; // Ã£¾ÒÀ¸´Ï ·çÇÁ Á¾·á
-                                            }
-                                        }
-                                        // ----------------------------------------
-
-                                        // »ìÀÎ¸¶ ½ºÆù (Ã£¾Æ³½ SpawnTransform À§Ä¡¿¡¼­ ½ºÆù)
-                                        AKillerCharacter* NewKiller = World->SpawnActorDeferred<AKillerCharacter>(AKillerCharacter::StaticClass(), SpawnTransform);
-                                        if (NewKiller)
-                                        {
-                                            // »ýÁ¸ÀÚ°¡ ¾²´ø Åë½Å¸Á(NetworkWorker)À» »ìÀÎ¸¶¿¡°Ô ±×´ë·Î ¹°·ÁÁÜ
-                                            NewKiller->NetworkWorker = this;
-                                            NewKiller->MyPlayerId = AssignedId;
-
-                                            // ½ºÆù ¿Ï·á ¹× ºùÀÇ (Possess)
-                                            NewKiller->FinishSpawning(SpawnTransform);
-                                            PC->Possess(NewKiller);
-
-                                            // --- ±âÁ¸¿¡ ÀÛ¼ºÇÏ½Å ±âÁ¸ »ýÁ¸ÀÚ ¾ÈÀü »èÁ¦ ·ÎÁ÷ À¯Áö ---
-                                            ATutorialCharacter* OldSurvivor = OwnerTutorialCharacter;
-                                            this->SetOwnerKiller(NewKiller);
-                                            if (OldSurvivor)
-                                            {
-                                                OldSurvivor->NetworkWorker = nullptr;
-                                                OldSurvivor->Destroy();
-                                            }
-
-                                            UE_LOG(LogTemp, Warning, TEXT("Swapped to Killer at SpawnPoint! Assigned ID: %d"), AssignedId);
-                                        }
-                                    }
-                                }
+                                OwnerTutorialCharacter->MyPlayerId = AssignedId;
+                                SendRoleSelection(ROLE_SURVIVOR);
+                                UE_LOG(LogTemp, Warning, TEXT("Assigned survivor ID: %d"), AssignedId);
                             }
-                            // 2. ³»°¡ »ýÁ¸ÀÚ(ID 1 ÀÌ»ó)·Î ÁöÁ¤µÇ¾ú´Ù¸é
-                            else
+                            else if (IsValid(OwnerKillerCharacter))
                             {
-                                if (IsValid(OwnerTutorialCharacter))
-                                {
-                                    OwnerTutorialCharacter->MyPlayerId = AssignedId;
-                                    UE_LOG(LogTemp, Warning, TEXT("Assigned survivor ID: %d"), AssignedId);
-
-                                    // ---- [»ýÁ¸ÀÚµµ ½ºÆù À§Ä¡·Î ÀÌµ¿½ÃÅ°°í ½Í´Ù¸é Ãß°¡] ----
-                                    UWorld* World = OwnerTutorialCharacter->GetWorld();
-                                    if (World)
-                                    {
-                                        TArray<AActor*> FoundPoints;
-                                        UGameplayStatics::GetAllActorsOfClass(World, ASpawnPoint::StaticClass(), FoundPoints);
-                                        for (AActor* Point : FoundPoints)
-                                        {
-                                            ASpawnPoint* SP = Cast<ASpawnPoint>(Point);
-                                            if (SP && SP->SpawnTeam == ETeamType::Survivor) // »ýÁ¸ÀÚ¿ë ½ºÆù Æ÷ÀÎÆ®¸¦ Ã£À¸¸é
-                                            {
-                                                // »õ·Î ½ºÆùÇÒ ÇÊ¿ä ¾øÀÌ ±âÁ¸ ¸öÅëÀ» ÇØ´ç À§Ä¡·Î ¼ø°£ÀÌµ¿
-                                                OwnerTutorialCharacter->SetActorTransform(SP->GetActorTransform(), false, nullptr, ETeleportType::TeleportPhysics);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    // -------------------------------------------------------
-                                }
-                                else if (IsValid(OwnerKillerCharacter))
-                                {
-                                    OwnerKillerCharacter->MyPlayerId = AssignedId;
-                                }
+                                OwnerKillerCharacter->MyPlayerId = AssignedId;
+                                SendRoleSelection(ROLE_KILLER);
+                                UE_LOG(LogTemp, Warning, TEXT("Assigned killer ID: %d"), AssignedId);
                             }
                         });
                 }
@@ -236,8 +179,11 @@ uint32 FNetworkWorker::Run()
                         float Fwd = MovePkt->Data.ForwardValue;
                         float Rght = MovePkt->Data.RightValue;
                         bool bSpr = MovePkt->Data.bIsSprinting;
+                        int32 Health = MovePkt->Data.CurrentHealth;
+                        bool bDowned = MovePkt->Data.bIsDowned;
+                        bool bCarried = MovePkt->Data.bIsBeingCarried;
 
-                        AsyncTask(ENamedThreads::GameThread, [this, RemoteId, CharacterType, NewLoc, Yaw, Fwd, Rght, bSpr]()
+                        AsyncTask(ENamedThreads::GameThread, [this, RemoteId, CharacterType, NewLoc, Yaw, Fwd, Rght, bSpr, Health, bDowned, bCarried]()
                             {
                                 if (IsValid(OwnerTutorialCharacter) && !OwnerTutorialCharacter->IsPendingKillPending())
                                 {
@@ -247,7 +193,7 @@ uint32 FNetworkWorker::Run()
                                     }
                                     else
                                     {
-                                        OwnerTutorialCharacter->UpdateRemotePlayer(RemoteId, NewLoc, Yaw, Fwd, Rght, bSpr);
+                                        OwnerTutorialCharacter->UpdateRemotePlayer(RemoteId, NewLoc, Yaw, Fwd, Rght, bSpr, Health, bDowned, bCarried);
                                     }
                                 }
                                 else if (IsValid(OwnerKillerCharacter) && !OwnerKillerCharacter->IsPendingKillPending())
@@ -258,7 +204,7 @@ uint32 FNetworkWorker::Run()
                                     }
                                     else
                                     {
-                                        OwnerKillerCharacter->UpdateRemoteSurvivor(RemoteId, NewLoc, Yaw, Fwd, Rght, bSpr);
+                                        OwnerKillerCharacter->UpdateRemoteSurvivor(RemoteId, NewLoc, Yaw, Fwd, Rght, bSpr, Health, bDowned, bCarried);
                                     }
                                 }
                             });

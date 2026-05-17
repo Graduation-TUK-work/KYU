@@ -8,6 +8,7 @@
 #include "Generator.h"
 #include "Kismet/GameplayStatics.h"
 #include "MyGameInstance.h"
+#include "MySpawnHelper.h"
 #include "Shared.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -82,24 +83,53 @@ void AMyGameModeBase::RestartPlayer(AController* NewPlayer)
         return;
     }
 
-    const FVector SpawnLocation = GetSafeSpawnLocation();
-    const FTransform SpawnTransform(SafeSpawnRotation, SpawnLocation);
+    const FTransform SpawnTransform = GetSafeSpawnTransform();
     APawn* NewPawn = SpawnDefaultPawnAtTransform(NewPlayer, SpawnTransform);
     if (NewPawn)
     {
-        NewPlayer->SetControlRotation(SafeSpawnRotation);
+        NewPlayer->SetControlRotation(SpawnTransform.Rotator());
         NewPlayer->Possess(NewPawn);
-        UE_LOG(LogTemp, Warning, TEXT("Spawned player at safe location: %s"), *SpawnLocation.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("Spawned player at safe transform: %s / %s"),
+            *SpawnTransform.GetLocation().ToString(),
+            *SpawnTransform.Rotator().ToString());
         return;
     }
 
     Super::RestartPlayer(NewPlayer);
 }
 
+FTransform AMyGameModeBase::GetSafeSpawnTransform() const
+{
+    if (UMyGameInstance* GI = GetGameInstance<UMyGameInstance>())
+    {
+        const ETeamType TargetTeam = (GI->LocalSelectedRole == ROLE_KILLER) ? ETeamType::Killer : ETeamType::Survivor;
+        const FTransform TeamSpawnTransform = UMySpawnHelper::GetTeamedSpawnTransform(this, TargetTeam);
+        if (!TeamSpawnTransform.Equals(FTransform::Identity))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Using SpawnPoint %s transform."),
+                TargetTeam == ETeamType::Killer ? TEXT("Killer") : TEXT("Survivor"));
+            return TeamSpawnTransform;
+        }
+    }
+
+    return FTransform(SafeSpawnRotation, GetSafeSpawnLocation());
+}
+
 FVector AMyGameModeBase::GetSafeSpawnLocation() const
 {
     if (UMyGameInstance* GI = GetGameInstance<UMyGameInstance>())
     {
+        const ETeamType TargetTeam = (GI->LocalSelectedRole == ROLE_KILLER) ? ETeamType::Killer : ETeamType::Survivor;
+        const FTransform TeamSpawnTransform = UMySpawnHelper::GetTeamedSpawnTransform(this, TargetTeam);
+        if (!TeamSpawnTransform.Equals(FTransform::Identity))
+        {
+            const FVector TeamSpawnLocation = TeamSpawnTransform.GetLocation();
+            UE_LOG(LogTemp, Warning, TEXT("Using SpawnPoint %s location: %s"),
+                TargetTeam == ETeamType::Killer ? TEXT("Killer") : TEXT("Survivor"),
+                *TeamSpawnLocation.ToString());
+            return TeamSpawnLocation;
+        }
+
         FVector NamedPlaneLocation;
         const FString TargetPlaneName = (GI->LocalSelectedRole == ROLE_KILLER) ? TEXT("Plane 11") : TEXT("Plane 16");
         if (TryGetSpawnLocationOnPlane(TargetPlaneName, NamedPlaneLocation))

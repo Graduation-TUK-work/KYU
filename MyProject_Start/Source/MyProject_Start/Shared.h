@@ -17,6 +17,7 @@ enum EPacketType : uint8 {
     PKT_JOIN = 1,
     PKT_MOVE = 2,
     PKT_ACTION = 3,
+    PKT_ROLE_SELECT = 4,
 };
 
 enum ECharacterType : uint8 {
@@ -55,6 +56,12 @@ struct FPacketAction {
     float RotationYaw;
 };
 
+struct FPacketRoleSelect {
+    uint8 Type;
+    int32 PlayerId;
+    uint8 Role;
+};
+
 struct FPlayerData {
     int32 PlayerId;
     uint8 CharacterType;
@@ -63,6 +70,9 @@ struct FPlayerData {
     float ForwardValue;
     float RightValue;
     bool bIsSprinting;
+    int32 CurrentHealth;
+    bool bIsDowned;
+    bool bIsBeingCarried;
 };
 
 struct FPacketJoin {

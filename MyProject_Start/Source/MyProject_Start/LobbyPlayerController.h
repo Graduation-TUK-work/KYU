@@ -28,6 +28,7 @@ private:
     FReply HandleServerIpConfirmed();
     void HandleServerIpCommitted(const FText& Text, ETextCommit::Type CommitMethod);
     void SetServerIpError(const FText& ErrorText);
+    bool TryConnectToConfiguredServer(const FString& InServerIP, FText& OutErrorText) const;
 
     UPROPERTY(EditDefaultsOnly, Category = "Lobby")
     TSubclassOf<UUserWidget> LobbyWidgetClass;

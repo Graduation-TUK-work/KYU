@@ -8,6 +8,7 @@ void UMyGameInstance::SetServerIP(const FString& InServerIP)
 {
     ServerIP = InServerIP;
     ServerIP.TrimStartAndEndInline();
+    bHasValidatedServerConnection = !ServerIP.IsEmpty();
 }
 
 FString UMyGameInstance::GetServerIP() const
@@ -15,6 +16,11 @@ FString UMyGameInstance::GetServerIP() const
     FString Result = ServerIP;
     Result.TrimStartAndEndInline();
     return Result.IsEmpty() ? FNetworkWorker::GetDefaultServerIP() : Result;
+}
+
+bool UMyGameInstance::HasValidatedServerConnection() const
+{
+    return bHasValidatedServerConnection;
 }
 
 void UMyGameInstance::SelectKiller()
@@ -52,11 +58,6 @@ void UMyGameInstance::SelectSurvivorAndOpenGame()
 
 FString UMyGameInstance::GetSelectedGameModeOption() const
 {
-    if (LocalSelectedRole == ROLE_KILLER)
-    {
-        return TEXT("game=/Script/MyProject_Start.KillerGameModeBase");
-    }
-
     return TEXT("game=/Script/MyProject_Start.MyGameModeBase");
 }
 
