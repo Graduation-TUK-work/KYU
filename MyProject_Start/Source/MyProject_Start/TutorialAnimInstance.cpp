@@ -30,6 +30,7 @@ void UTutorialAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			}
 
 			bIsRepairingGenerator = Character->bIsRepairingGenerator;
+			IsInjured = Character->IsInjured();
 		}
 	}
 }

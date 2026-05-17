@@ -9,6 +9,7 @@
 class FNetworkWorker;
 class AKillerCharacter;
 class AGenerator;
+class ABandagePickup;
 class AParkourInteractable;
 class UAnimSequence;
 
@@ -30,8 +31,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
 	float MaxRecoveryTime = 5.33f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+	float SelfRecoveryTime = 8.0f;
+
 	UFUNCTION(BlueprintCallable, Category = "PlayerState")
 	void ForceDownedState();
+
+	UFUNCTION(BlueprintCallable, Category = "PlayerState")
+	void ForceInjuredState();
 
 	ATutorialCharacter();
 	void MoveForward(float Value);
@@ -81,14 +88,23 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
 	bool bIsBeingRevived = false;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
+	bool bIsSelfReviving = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	bool bHasBandage = false;
+
 	void UpdateRemotePlayer(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
 	void UpdateRemoteKiller(int32 PlayerId, FVector Location, float RotationYaw, float Forward, float Right, bool bSprint);
 	void HandleNetworkAction(uint8 ActionType, int32 InstigatorId, int32 TargetId, FVector Location, float RotationYaw);
 	void SendGeneratorActionToServer(uint8 ActionType, AGenerator* Generator);
+	void SendBandageActionToServer(uint8 ActionType, ABandagePickup* BandagePickup);
 	void SetRepairingGenerator(bool bRepairing);
 	void SetRevivingSurvivor(bool bReviving);
 	void StopInteractingWithCurrentTarget(bool bRestoreAnimation);
 	void StartVaultFromInteractable(AParkourInteractable* ParkourInteractable);
+	bool HasBandage() const { return bHasBandage; }
+	void SetHasBandage(bool bNewHasBandage) { bHasBandage = bNewHasBandage; }
 
 	UPROPERTY(BlueprintReadOnly, Category = "NetworkData")
 	float RemoteForwardValue;
@@ -109,6 +125,9 @@ protected:
 
 public:
 	virtual void Tick(float DeltaTime) override;
+
+	UFUNCTION(BlueprintPure, Category = "Status")
+	bool IsInjured() const { return CurrentHealth == 1 && !IsDowned && !IsBeingCarried; }
 
 	UFUNCTION(BlueprintCallable)
 	void SetCanVault(bool CanIt) { bCanVault = CanIt; }
@@ -167,7 +186,9 @@ protected:
 private:
 	void ShowGeneratorRepairCount() const;
 	AGenerator* FindGeneratorForNetworkAction(int32 GeneratorId, const FVector& Location) const;
+	ABandagePickup* FindBandageForNetworkAction(int32 BandageId, const FVector& Location) const;
 	void ApplyGeneratorNetworkAction(uint8 ActionType, int32 GeneratorId, const FVector& Location, float RepairProgress);
+	void ApplyBandageNetworkAction(int32 BandageId, const FVector& Location);
 	void SendSurvivorActionToServer(uint8 ActionType, ATutorialCharacter* TargetCharacter);
 	void ApplyHitReaction(bool bRespectCooldown);
 	void PlayTemporaryBodyAnimation(UAnimSequence* Animation);
@@ -176,7 +197,10 @@ private:
 	void PlayRepairMontageEnd();
 	void RestoreBodyAnimClass();
 	bool CanStartVault() const;
+	void BeginVaultToLocation(const FVector& TargetLocation);
+	void FinishVault();
 
 	TWeakObjectPtr<ATutorialCharacter> CurrentReviver;
+	FTimerHandle VaultFinishTimerHandle;
 };
 

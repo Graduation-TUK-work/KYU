@@ -1,4 +1,4 @@
-#include "KillerCharacter.h"
+﻿#include "KillerCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -7,6 +7,8 @@
 #include "Animation/AnimSequence.h"
 #include "DrawDebugHelpers.h"
 #include "UObject/ConstructorHelpers.h"
+#include "MyProject_Start/BandagePickup.h"
+#include "MyProject_Start/MyGameInstance.h"
 #include "MyProject_Start/Player/TutorialCharacter.h"
 #include "MyProject_Start/NetworkWorker.h"
 #include "MyProject_Start/Generator.h"
@@ -91,10 +93,10 @@ AKillerCharacter::AKillerCharacter()
         CarryAnimation = CarryAnimationAsset.Object;
     }
 
-    // 3占쏙옙칭 占쌕듸옙占?占쌘신울옙占쏙옙 占쏙옙占쏙옙占쏙옙 占십곤옙 占쏙옙占쏙옙
+    // 3?좎룞?숈묶 ?좎뙐?몄삕???좎뙓?좎슱?쇿뜝?숈삕 ?좎룞?쇿뜝?숈삕?좎룞???좎떗怨ㅼ삕 ?좎룞?쇿뜝?숈삕
     GetMesh()->SetOwnerNoSee(true);
 
-    // 占쏙옙占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙 占십깍옙화
+    // ?좎룞?쇿뜝?숈삕 ?좎룞?쇿뜝?숈삕 ?좎룞?쇿뜝?숈삕 ?좎떗源띿삕??
     bIsAttacking = false;
 
 
@@ -127,7 +129,13 @@ void AKillerCharacter::BeginPlay()
 
         if (NetworkWorker == nullptr)
         {
-            NetworkWorker = new FNetworkWorker(FNetworkWorker::GetDefaultServerIP(), FNetworkWorker::GetDefaultServerPort());
+            FString ServerIP = FNetworkWorker::GetDefaultServerIP();
+            if (UMyGameInstance* GI = GetGameInstance<UMyGameInstance>())
+            {
+                ServerIP = GI->GetServerIP();
+            }
+
+            NetworkWorker = new FNetworkWorker(ServerIP, FNetworkWorker::GetDefaultServerPort());
             NetworkWorker->SetOwnerKiller(this);
             FRunnableThread::Create(NetworkWorker, TEXT("KillerNetworkThread"));
         }
@@ -252,11 +260,11 @@ void AKillerCharacter::StartAttack()
     );
 }
 
-// 占쏙옙 占쌉쇽옙占쏙옙 占쏙옙占쌩울옙 占쌍니몌옙占싱쇽옙 占쏙옙티占쏙옙占쏙옙(Notify)占쏙옙占쏙옙 호占쏙옙占쏙옙 占쏙옙占쏙옙占쌉니댐옙.
+// ?좎룞???좎뙃?쎌삕?좎룞???좎룞?쇿뜝?⑹슱???좎뙇?덈챿?쇿뜝?깆눦???좎룞?숉떚?좎룞?쇿뜝?숈삕(Notify)?좎룞?쇿뜝?숈삕 ?멨뜝?숈삕?좎룞???좎룞?쇿뜝?숈삕?좎뙃?덈뙋??
 void AKillerCharacter::EndAttack()
 {
     bIsAttacking = false;
-    // 占쌕쏙옙 占쏙옙占쏙옙 占쌈듸옙占쏙옙 占쏙옙占쏙옙
+    // ?좎뙐?숈삕 ?좎룞?쇿뜝?숈삕 ?좎뙂?몄삕?좎룞???좎룞?쇿뜝?숈삕
     GetCharacterMovement()->MaxWalkSpeed = 400.0f;
     UE_LOG(LogTemp, Warning, TEXT("EndAttack called"));
 }
@@ -360,7 +368,7 @@ void AKillerCharacter::CheckHit()
         CandidateCount, bHasDealtDamage ? TEXT("true") : TEXT("false"));
 }
 
-// 占쏙옙占쏙옙占쏙옙 占쏙옙占쏙옙 占쌉쇽옙
+// ?좎룞?쇿뜝?숈삕?좎룞???좎룞?쇿뜝?숈삕 ?좎뙃?쎌삕
 void AKillerCharacter::PickupSurvivor()
 {
     if (CarriedSurvivor) return;
@@ -438,14 +446,14 @@ void AKillerCharacter::SendLocationToServer()
         FPacketMove MovePkt;
         MovePkt.Type = PKT_MOVE;
         MovePkt.Data.PlayerId = MyPlayerId;
-        MovePkt.Data.CharacterType = CHARACTER_KILLER; // ?댁씤留????
+        MovePkt.Data.CharacterType = CHARACTER_KILLER; // ??곸뵥筌?????
 
         MovePkt.Data.X = GetActorLocation().X;
         MovePkt.Data.Y = GetActorLocation().Y;
         MovePkt.Data.Z = GetActorLocation().Z;
         MovePkt.Data.RotationYaw = GetActorRotation().Yaw;
 
-        // [以묒슂] ?띾룄 怨꾩궛 ????낅젰媛믪쓣 吏곸젒 ?ｌ뒿?덈떎.
+        // [餓λ쵐?? ??얜즲 ?④쑴沅???????낆젾揶쏅???筌욊낯???節뚮뮸??덈뼄.
         MovePkt.Data.ForwardValue = MoveForwardValue;
         MovePkt.Data.RightValue = MoveRightValue;
         MovePkt.Data.bIsSprinting = false;
@@ -536,12 +544,12 @@ void AKillerCharacter::SendActionToServer(uint8 ActionType, int32 TargetId)
     if (!NetworkWorker || !NetworkWorker->GetSocket()) return;
 
     FPacketAction ActionPkt;
-    ActionPkt.Type = PKT_ACTION; // Shared.h???뺤쓽?????
+    ActionPkt.Type = PKT_ACTION; // Shared.h???類ㅼ벥??????
     ActionPkt.ActionType = ActionType;
     ActionPkt.InstigatorId = MyPlayerId;
     ActionPkt.TargetId = TargetId;
 
-    // ?꾩옱 ?꾩튂? ?뚯쟾媛믩룄 媛숈씠 ?ㅼ뼱 蹂대깄?덈떎 (?ㅻⅨ ?대씪?먯꽌 ?뺥솗???꾩튂??蹂댁씠?꾨줉)
+    // ?袁⑹삺 ?袁⑺뒄?? ???읈揶쏅?猷?揶쏆늿????쇰선 癰귣?源??덈뼄 (??삘뀲 ????癒?퐣 ?類μ넇???袁⑺뒄??癰귣똻??袁⑥쨯)
     FVector Loc = GetActorLocation();
     ActionPkt.X = Loc.X;
     ActionPkt.Y = Loc.Y;
@@ -675,6 +683,69 @@ void AKillerCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId,
         return;
     }
 
+    if (ActionType == ACTION_SELF_REVIVE_START || ActionType == ACTION_SELF_REVIVE_CANCEL || ActionType == ACTION_SELF_REVIVE_COMPLETE)
+    {
+        ATutorialCharacter* Survivor = nullptr;
+        if (RemoteSurvivors.Contains(TargetId) && IsValid(RemoteSurvivors[TargetId]))
+        {
+            Survivor = RemoteSurvivors[TargetId];
+        }
+
+        if (!Survivor)
+        {
+            return;
+        }
+
+        if (ActionType == ACTION_SELF_REVIVE_START)
+        {
+            Survivor->bIsBeingRevived = true;
+            Survivor->bIsSelfReviving = true;
+            Survivor->IsInteracting = true;
+        }
+        else if (ActionType == ACTION_SELF_REVIVE_CANCEL)
+        {
+            Survivor->bIsBeingRevived = false;
+            Survivor->bIsSelfReviving = false;
+            Survivor->RecoveryProgress = 0.0f;
+            Survivor->IsInteracting = false;
+        }
+        else if (ActionType == ACTION_SELF_REVIVE_COMPLETE)
+        {
+            Survivor->SetHasBandage(false);
+            if (Survivor->IsDowned)
+            {
+                Survivor->CompleteInteract_Implementation();
+            }
+        }
+
+        return;
+    }
+
+    if (ActionType == ACTION_BANDAGE_PICKUP)
+    {
+        TArray<AActor*> FoundBandages;
+        UGameplayStatics::GetAllActorsOfClass(GetWorld(), ABandagePickup::StaticClass(), FoundBandages);
+
+        for (AActor* Actor : FoundBandages)
+        {
+            ABandagePickup* BandagePickup = Cast<ABandagePickup>(Actor);
+            if (!BandagePickup) continue;
+
+            if (BandagePickup->GetBandageId() == TargetId || FVector::DistSquared(BandagePickup->GetActorLocation(), Location) < 2500.0f)
+            {
+                BandagePickup->ApplyCollectedState();
+                break;
+            }
+        }
+
+        if (RemoteSurvivors.Contains(InstigatorId) && IsValid(RemoteSurvivors[InstigatorId]))
+        {
+            RemoteSurvivors[InstigatorId]->SetHasBandage(true);
+        }
+
+        return;
+    }
+
     if (ActionType == ACTION_KILLER_ATTACK)
     {
         if (RemoteKillers.Contains(InstigatorId) && IsValid(RemoteKillers[InstigatorId]))
@@ -683,7 +754,7 @@ void AKillerCharacter::HandleNetworkAction(uint8 ActionType, int32 InstigatorId,
             RemoteKiller->SetActorLocation(Location);
             RemoteKiller->SetActorRotation(FRotator(0.0f, RotationYaw, 0.0f));
 
-            // StartAttack() ????꾩떊 ?좊땲硫붿씠?섎쭔 諛붾줈 媛뺤젣 ?ъ깮?쒗궡 (臾댄븳 猷⑦봽 諛⑹?)
+            // StartAttack() ?????袁⑸뻿 ?醫딅빍筌롫뗄???롮춸 獄쏅뗀以?揶쏅벡????源??쀪땀 (?얜똾釉??룐뫂遊?獄쎻뫗?)
             if (RemoteKiller->BodyAttackAnimation)
             {
                 RemoteKiller->PlayTemporaryBodyAnimation(RemoteKiller->BodyAttackAnimation);
@@ -783,6 +854,7 @@ void AKillerCharacter::RestoreBodyAnimClass()
         }
     }
 }
+
 
 
 
